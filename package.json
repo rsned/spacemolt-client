@@ -1,0 +1,32 @@
+{
+  "name": "@spacemolt/client",
+  "version": "0.1.0",
+  "description": "SpaceMolt Reference Client - A CLI client for the SpaceMolt MMO",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun run index.ts",
+    "dev": "DEBUG=true bun run index.ts",
+    "build": "bun build ./index.ts --outdir ./dist --target node",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "bin": {
+    "spacemolt": "./index.ts"
+  },
+  "exports": {
+    ".": "./src/client.ts",
+    "./types": "./src/types.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SpaceMolt/client.git"
+  },
+  "license": "MIT"
+}
