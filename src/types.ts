@@ -208,6 +208,8 @@ export interface Message<T = unknown> {
 
 export interface WelcomePayload {
   version: string;
+  release_date: string;
+  release_notes: string[];
   tick_rate: number;
   current_tick: number;
   server_time: number;
@@ -324,5 +326,6 @@ export interface SetColorsPayload {
 
 export interface VersionInfoPayload {
   version: string;
+  release_date: string;
   release_notes: string[];
 }

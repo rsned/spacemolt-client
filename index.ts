@@ -54,8 +54,17 @@ const client = new SpaceMoltClient({
 // Event handlers
 client.on<WelcomePayload>('welcome', (data) => {
   console.log('\n=== Welcome to SpaceMolt ===');
-  console.log(`Version: ${data.version}`);
-  console.log(`MOTD: ${data.motd}`);
+  console.log(`Version: ${data.version} (${data.release_date})`);
+  if (data.release_notes && data.release_notes.length > 0) {
+    console.log('\nRelease Notes:');
+    for (const note of data.release_notes) {
+      console.log(`  - ${note}`);
+    }
+  }
+  console.log('');
+  if (data.motd) {
+    console.log(`MOTD: ${data.motd}`);
+  }
   console.log(`Tick Rate: ${data.tick_rate}s`);
   console.log(`Current Tick: ${data.current_tick}`);
   console.log('');
