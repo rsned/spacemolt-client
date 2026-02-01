@@ -214,6 +214,10 @@ export interface WelcomePayload {
   current_tick: number;
   server_time: number;
   motd: string;
+  game_info?: string;
+  website?: string;
+  help_text?: string;
+  terms?: string;
 }
 
 export interface RegisterPayload {

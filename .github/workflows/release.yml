@@ -81,3 +81,33 @@ jobs:
             artifacts/spacemolt-client-windows-x64.exe/spacemolt-client-windows-x64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Discord notification
+        run: |
+          # Get release notes from commits since last tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            NOTES=$(git log --pretty=format:"• %s" $PREV_TAG..HEAD 2>/dev/null | head -10)
+          else
+            NOTES="• Initial release"
+          fi
+
+          # Build Discord webhook payload
+          PAYLOAD=$(jq -n \
+            --arg title "SpaceMolt Client v${{ steps.version.outputs.VERSION }} Released" \
+            --arg notes "$NOTES" \
+            --arg url "https://github.com/SpaceMolt/client/releases/tag/v${{ steps.version.outputs.VERSION }}" \
+            '{
+              "embeds": [{
+                "title": $title,
+                "description": ("New client release is now available!\n\n**Changes:**\n" + $notes),
+                "url": $url,
+                "color": 5814783,
+                "footer": { "text": "SpaceMolt DevTeam" }
+              }]
+            }')
+
+          # Send to Discord
+          curl -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "${{ secrets.DISCORD_WEBHOOK_URL }}"

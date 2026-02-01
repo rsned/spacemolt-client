@@ -58,6 +58,8 @@ export class SpaceMoltClient {
   private eventHandlers: Map<string, Set<EventHandler<unknown>>> = new Map();
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private messageQueue: Message[] = [];
+  private reconnectAttempts: number = 0;
+  private savedCredentials: { username: string; token: string } | null = null;
 
   public state: ClientState = {
     connected: false,
@@ -90,8 +92,9 @@ export class SpaceMoltClient {
 
         this.ws.onopen = () => {
           this.state.connected = true;
+          this.reconnectAttempts = 0; // Reset on successful connection
           this.log('Connected to server');
-          this.emit('connected', {});
+          this.emit('connected', { reconnected: this.savedCredentials !== null });
           this.flushMessageQueue();
           resolve();
         };
@@ -137,13 +140,32 @@ export class SpaceMoltClient {
   private scheduleReconnect(): void {
     if (this.reconnectTimeout) return;
 
-    this.log(`Reconnecting in ${this.options.reconnectDelay}ms...`);
+    this.reconnectAttempts++;
+    // Exponential backoff: delay increases with each attempt (max 60 seconds)
+    const delay = Math.min(
+      this.options.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1),
+      60000
+    );
+
+    this.log(`Reconnecting in ${Math.round(delay / 1000)}s (attempt ${this.reconnectAttempts})...`);
+    this.emit('reconnecting', { attempt: this.reconnectAttempts, delay });
+
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectTimeout = null;
       this.connect().catch((err) => {
         this.log('Reconnection failed:', err);
       });
-    }, this.options.reconnectDelay);
+    }, delay);
+  }
+
+  // Get saved credentials for auto-relogin
+  getSavedCredentials(): { username: string; token: string } | null {
+    return this.savedCredentials;
+  }
+
+  // Clear saved credentials
+  clearCredentials(): void {
+    this.savedCredentials = null;
   }
 
   // Message handling
@@ -253,6 +275,7 @@ export class SpaceMoltClient {
   }
 
   login(username: string, token: string): void {
+    this.savedCredentials = { username, token };
     this.send<LoginPayload>('login', { username, token });
   }
 
@@ -261,6 +284,7 @@ export class SpaceMoltClient {
     this.state.authenticated = false;
     this.state.player = null;
     this.state.ship = null;
+    this.savedCredentials = null;
   }
 
   // Navigation

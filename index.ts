@@ -62,6 +62,10 @@ client.on<WelcomePayload>('welcome', (data) => {
     }
   }
   console.log('');
+  if (data.terms) {
+    console.log(`Terms: ${data.terms}`);
+    console.log('');
+  }
   if (data.motd) {
     console.log(`MOTD: ${data.motd}`);
   }
@@ -75,6 +79,18 @@ client.on<WelcomePayload>('welcome', (data) => {
     client.login(credentials.username, credentials.token);
   } else {
     showHelp();
+  }
+});
+
+// Handle reconnection events
+client.on('reconnecting', (data: { attempt: number; delay: number }) => {
+  console.log(`\nConnection lost. Reconnecting (attempt ${data.attempt})...`);
+});
+
+client.on('connected', (data: { reconnected?: boolean }) => {
+  if (data.reconnected) {
+    console.log('\nReconnected to server!');
+    // Auto-relogin will happen when welcome message is received
   }
 });
 
