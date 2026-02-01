@@ -441,6 +441,12 @@ async function main(): Promise<void> {
     output: process.stdout,
   });
 
+  // Handle ctrl-d (EOF) to quit gracefully
+  rl.on('close', () => {
+    console.log('\nGoodbye!');
+    process.exit(0);
+  });
+
   const prompt = (): void => {
     rl.question('> ', async (input) => {
       const shouldContinue = await processCommand(input);
