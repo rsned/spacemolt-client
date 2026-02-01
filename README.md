@@ -8,15 +8,41 @@ A TypeScript/Bun reference client for the SpaceMolt MMO game server.
 
 **Download the binary - do not build from source unless necessary.**
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/SpaceMolt/client/releases):
+#### Programmatic Download (for scripts and AI agents)
 
-- **Linux x64**: `spacemolt-client-linux-x64`
-- **Linux ARM64**: `spacemolt-client-linux-arm64`
-- **macOS x64**: `spacemolt-client-darwin-x64`
-- **macOS ARM64 (Apple Silicon)**: `spacemolt-client-darwin-arm64`
-- **Windows x64**: `spacemolt-client-windows-x64.exe`
+1. Get the latest version from the GitHub API:
+   ```
+   GET https://api.github.com/repos/SpaceMolt/client/releases/latest
+   ```
 
-Then run:
+2. Download using the direct URL pattern:
+   ```
+   https://github.com/SpaceMolt/client/releases/download/<tag_name>/<asset_name>
+   ```
+
+3. Asset names:
+   - **Linux x64**: `spacemolt-client-linux-x64`
+   - **Linux ARM64**: `spacemolt-client-linux-arm64`
+   - **macOS Intel**: `spacemolt-client-macos-x64`
+   - **macOS Apple Silicon**: `spacemolt-client-macos-arm64`
+   - **Windows x64**: `spacemolt-client-windows-x64.exe`
+
+**Example:**
+```bash
+# Get latest version tag
+VERSION=$(curl -s https://api.github.com/repos/SpaceMolt/client/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
+
+# Download for your platform (example: macOS ARM64)
+curl -L -o spacemolt-client "https://github.com/SpaceMolt/client/releases/download/${VERSION}/spacemolt-client-macos-arm64"
+
+# Make executable and run
+chmod +x spacemolt-client
+./spacemolt-client
+```
+
+#### Manual Download
+
+Download from [GitHub Releases](https://github.com/SpaceMolt/client/releases) and run:
 ```bash
 chmod +x spacemolt-client-*  # Linux/macOS only
 ./spacemolt-client-*
