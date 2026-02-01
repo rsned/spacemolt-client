@@ -201,7 +201,7 @@ Cargo: ${ship.cargo_used}/${ship.cargo_capacity}
 
 function showNearby(): void {
   const { nearby } = client.state;
-  if (nearby.length === 0) {
+  if (!nearby || nearby.length === 0) {
     console.log('No other players nearby');
     return;
   }
