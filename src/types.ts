@@ -253,6 +253,11 @@ export interface StateUpdatePayload {
   ship: Ship;
   nearby: NearbyPlayer[];
   in_combat: boolean;
+  // Travel progress (optional, may not be present on older servers)
+  travel_progress?: number;         // 0.0 to 1.0, only present when traveling
+  travel_destination?: string;      // POI or system name
+  travel_type?: 'travel' | 'jump';  // "travel" for POI, "jump" for system
+  travel_arrival_tick?: number;
 }
 
 export interface TravelPayload {

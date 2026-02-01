@@ -39,6 +39,13 @@ export interface ClientOptions {
   debug?: boolean;
 }
 
+export interface TravelState {
+  progress: number;         // 0.0 to 1.0
+  destination: string;      // POI or system name
+  type: 'travel' | 'jump';  // "travel" for POI, "jump" for system
+  arrivalTick: number;
+}
+
 export interface ClientState {
   connected: boolean;
   authenticated: boolean;
@@ -50,6 +57,7 @@ export interface ClientState {
   nearby: NearbyPlayer[];
   inCombat: boolean;
   currentTick: number;
+  traveling: TravelState | null;  // Travel progress, null if not traveling
 }
 
 export class SpaceMoltClient {
@@ -72,6 +80,7 @@ export class SpaceMoltClient {
     nearby: [],
     inCombat: false,
     currentTick: 0,
+    traveling: null,
   };
 
   constructor(options: ClientOptions) {
@@ -240,6 +249,19 @@ export class SpaceMoltClient {
     this.state.ship = payload.ship;
     this.state.nearby = payload.nearby;
     this.state.inCombat = payload.in_combat;
+
+    // Update travel state
+    if (payload.travel_progress !== undefined && payload.travel_type && payload.travel_destination) {
+      this.state.traveling = {
+        progress: payload.travel_progress,
+        destination: payload.travel_destination,
+        type: payload.travel_type,
+        arrivalTick: payload.travel_arrival_tick ?? 0,
+      };
+    } else {
+      this.state.traveling = null;
+    }
+
     this.emit('state_update', payload);
   }
 
