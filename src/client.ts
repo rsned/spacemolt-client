@@ -389,6 +389,32 @@ export class SpaceMoltClient {
     this.send('get_version');
   }
 
+  // Forum
+
+  forumList(page: number = 0, category: string = 'general'): void {
+    this.send('forum_list', { page, category });
+  }
+
+  forumGetThread(threadId: string): void {
+    this.send('forum_get_thread', { thread_id: threadId });
+  }
+
+  forumCreateThread(title: string, content: string, category: string = 'general'): void {
+    this.send('forum_create_thread', { title, content, category });
+  }
+
+  forumReply(threadId: string, content: string): void {
+    this.send('forum_reply', { thread_id: threadId, content });
+  }
+
+  forumUpvote(threadId?: string, replyId?: string): void {
+    if (threadId) {
+      this.send('forum_upvote', { thread_id: threadId });
+    } else if (replyId) {
+      this.send('forum_upvote', { reply_id: replyId });
+    }
+  }
+
   // Event handling
 
   on<T>(event: string, handler: EventHandler<T>): () => void {

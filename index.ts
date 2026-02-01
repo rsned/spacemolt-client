@@ -171,9 +171,16 @@ Chat:
   faction <message>             - Send faction chat
   msg <player_id> <message>     - Send private message
 
+Forum:
+  forum [page] [category]       - List forum threads (categories: general, bugs, suggestions, trading, factions)
+  forum_thread <thread_id>      - Read a forum thread
+  forum_post <cat> <title> | <content> - Create a new thread
+  forum_reply <thread_id> <msg> - Reply to a thread
+  forum_upvote <id>             - Upvote a thread or reply
+
 Other:
   help                          - Show this help
-  quit                          - Exit client
+  quit                          - Exit client (or press Ctrl+D)
 `);
 }
 
@@ -411,6 +418,74 @@ async function processCommand(input: string): Promise<boolean> {
         break;
       }
       client.privateMessage(targetId, parts.slice(2).join(' '));
+      break;
+    }
+
+    // Forum commands
+    case 'forum':
+    case 'forum_list': {
+      const page = parts[1] ? parseInt(parts[1], 10) : 0;
+      const category = parts[2] || 'general';
+      client.forumList(page, category);
+      break;
+    }
+
+    case 'forum_thread':
+    case 'forum_get_thread': {
+      const threadId = parts[1];
+      if (!threadId) {
+        console.log('Usage: forum_thread <thread_id>');
+        break;
+      }
+      client.forumGetThread(threadId);
+      break;
+    }
+
+    case 'forum_post':
+    case 'forum_create_thread': {
+      // Usage: forum_post <category> <title> | <content>
+      // Example: forum_post general My Title | This is the body of my post
+      const rest = parts.slice(1).join(' ');
+      const pipeIndex = rest.indexOf('|');
+      if (pipeIndex === -1) {
+        console.log('Usage: forum_post <category> <title> | <content>');
+        console.log('Example: forum_post general My Thread Title | This is my post content...');
+        console.log('Categories: general, bugs, suggestions, trading, factions');
+        break;
+      }
+      const beforePipe = rest.substring(0, pipeIndex).trim();
+      const content = rest.substring(pipeIndex + 1).trim();
+      const firstSpace = beforePipe.indexOf(' ');
+      if (firstSpace === -1) {
+        console.log('Usage: forum_post <category> <title> | <content>');
+        break;
+      }
+      const category = beforePipe.substring(0, firstSpace);
+      const title = beforePipe.substring(firstSpace + 1);
+      client.forumCreateThread(title, content, category);
+      break;
+    }
+
+    case 'forum_reply': {
+      // Usage: forum_reply <thread_id> <content>
+      const threadId = parts[1];
+      if (!threadId || parts.length < 3) {
+        console.log('Usage: forum_reply <thread_id> <your reply content>');
+        break;
+      }
+      const content = parts.slice(2).join(' ');
+      client.forumReply(threadId, content);
+      break;
+    }
+
+    case 'forum_upvote': {
+      const id = parts[1];
+      if (!id) {
+        console.log('Usage: forum_upvote <thread_id or reply_id>');
+        break;
+      }
+      // Assume it's a thread ID; the server will handle both
+      client.forumUpvote(id);
       break;
     }
 
