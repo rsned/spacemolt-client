@@ -28,6 +28,81 @@ export interface PlayerSkill {
   xp: number;
 }
 
+// Skill definition from get_skills (full skill tree)
+export interface SkillDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: SkillCategory;
+  max_level: number;
+  required_skills?: Record<string, number>;  // skill_id -> required level
+  bonus_per_level?: Record<string, number>;  // stat_name -> bonus per level
+  xp_per_level: number[];
+}
+
+export type SkillCategory =
+  | 'Combat'
+  | 'Navigation'
+  | 'Mining'
+  | 'Trading'
+  | 'Crafting'
+  | 'Salvaging'
+  | 'Support'
+  | 'Engineering'
+  | 'Drones'
+  | 'Exploration'
+  | 'Ships'
+  | 'Faction';
+
+// All 89 skill IDs
+export type SkillID =
+  // Combat (19)
+  | 'weapons_basic' | 'weapons_advanced' | 'weapons_specialization'
+  | 'energy_weapons' | 'kinetic_weapons' | 'missile_weapons'
+  | 'shields' | 'shields_advanced' | 'shield_hardening'
+  | 'armor' | 'armor_advanced' | 'targeting' | 'evasion'
+  | 'speed_combat' | 'electronic_warfare' | 'ecm_resistance'
+  | 'target_painting' | 'piracy' | 'bounty_hunting'
+  // Navigation (5)
+  | 'navigation' | 'fuel_efficiency' | 'jump_drive'
+  | 'jump_calibration' | 'warp_efficiency'
+  // Mining (7)
+  | 'mining_basic' | 'mining_advanced' | 'deep_core_mining'
+  | 'ice_mining' | 'gas_harvesting' | 'refinement' | 'refinement_advanced'
+  // Trading (6)
+  | 'trading' | 'negotiation' | 'market_analysis'
+  | 'smuggling' | 'hauling' | 'contracts'
+  // Crafting (9)
+  | 'crafting_basic' | 'crafting_advanced' | 'crafting_mastery'
+  | 'weapon_crafting' | 'shield_crafting' | 'electronics_crafting'
+  | 'ship_crafting' | 'module_crafting' | 'blueprint_research'
+  // Salvaging (3)
+  | 'salvaging' | 'salvaging_advanced' | 'archaeology'
+  // Support (9)
+  | 'scanning' | 'scanning_advanced' | 'cloaking' | 'cloaking_advanced'
+  | 'leadership' | 'fleet_coordination' | 'diplomacy'
+  | 'hacking' | 'counter_hacking'
+  // Engineering (8)
+  | 'engineering' | 'advanced_engineering' | 'power_grid'
+  | 'cpu_management' | 'damage_control' | 'repair_systems'
+  | 'capacitor_systems' | 'rigging'
+  // Drones (8)
+  | 'drone_operation' | 'drone_control' | 'drone_durability'
+  | 'combat_drones' | 'mining_drones' | 'repair_drones'
+  | 'salvage_drones' | 'drone_interfacing'
+  // Exploration (5)
+  | 'exploration' | 'astrometrics' | 'survey'
+  | 'cartography' | 'anomaly_detection'
+  // Ships (7)
+  | 'small_ships' | 'medium_ships' | 'large_ships'
+  | 'capital_ships' | 'industrial_ships' | 'covert_ops' | 'fleet_command'
+  // Faction (3)
+  | 'faction_warfare' | 'corporation_management' | 'station_management';
+
+export interface SkillsPayload {
+  skills: Record<SkillID, SkillDefinition>;
+}
+
 export interface PlayerStats {
   ships_destroyed: number;
   times_destroyed: number;
