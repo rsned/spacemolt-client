@@ -188,6 +188,11 @@ export type MessageType =
   | 'chat'
   | 'chat_message'
   | 'create_faction'
+  | 'join_faction'
+  | 'leave_faction'
+  | 'faction_invite'
+  | 'faction_kick'
+  | 'faction_promote'
   | 'set_status'
   | 'set_colors'
   | 'set_anonymous'
@@ -195,10 +200,43 @@ export type MessageType =
   | 'get_system'
   | 'get_poi'
   | 'get_base'
+  | 'get_ship'
   | 'get_skills'
   | 'get_recipes'
   | 'get_version'
-  | 'version_info';
+  | 'version_info'
+  // Player-to-player trading
+  | 'trade_offer'
+  | 'trade_accept'
+  | 'trade_decline'
+  | 'trade_cancel'
+  | 'get_trades'
+  | 'trade_offer_received'
+  // Player market
+  | 'list_item'
+  | 'buy_listing'
+  | 'cancel_list'
+  | 'get_listings'
+  // Wrecks
+  | 'get_wrecks'
+  | 'loot_wreck'
+  | 'salvage_wreck'
+  // Insurance
+  | 'buy_insurance'
+  | 'claim_insurance'
+  | 'set_home_base'
+  // Ship management
+  | 'buy_ship'
+  | 'install_mod'
+  | 'uninstall_mod'
+  // Forum
+  | 'forum_list'
+  | 'forum_get_thread'
+  | 'forum_create_thread'
+  | 'forum_reply'
+  | 'forum_upvote'
+  | 'forum_delete_thread'
+  | 'forum_delete_reply';
 
 export interface Message<T = unknown> {
   type: MessageType;
@@ -337,4 +375,128 @@ export interface VersionInfoPayload {
   version: string;
   release_date: string;
   release_notes: string[];
+}
+
+// Player-to-player trading
+export interface TradeOfferPayload {
+  target_id: string;
+  offer_items: CargoItem[];
+  offer_credits: number;
+  request_items: CargoItem[];
+  request_credits: number;
+}
+
+export interface TradeActionPayload {
+  trade_id: string;
+}
+
+export interface Trade {
+  trade_id: string;
+  from_player: string;
+  from_name: string;
+  to_player: string;
+  to_name: string;
+  offer_items: CargoItem[];
+  offer_credits: number;
+  request_items: CargoItem[];
+  request_credits: number;
+  created_at: string;
+}
+
+export interface TradesPayload {
+  incoming: Trade[];
+  outgoing: Trade[];
+}
+
+// Market listings
+export interface ListItemPayload {
+  item_id: string;
+  quantity: number;
+  price_each: number;
+}
+
+export interface BuyListingPayload {
+  listing_id: string;
+  quantity: number;
+}
+
+export interface CancelListPayload {
+  listing_id: string;
+}
+
+// Wrecks
+export interface Wreck {
+  id: string;
+  poi_id: string;
+  destroyed_player: string;
+  destroyed_ship_class: string;
+  killer_id?: string;
+  killer_name?: string;
+  contents: CargoItem[];
+  modules: string[];
+  created_tick: number;
+  expires_tick: number;
+}
+
+export interface LootWreckPayload {
+  wreck_id: string;
+  item_id: string;
+  quantity: number;
+}
+
+export interface SalvageWreckPayload {
+  wreck_id: string;
+}
+
+// Insurance
+export interface BuyInsurancePayload {
+  coverage_percent: number;
+}
+
+export interface InsurancePolicy {
+  base_id: string;
+  ship_class: string;
+  coverage_percent: number;
+  premium_paid: number;
+}
+
+// Ship management
+export interface BuyShipPayload {
+  ship_class: string;
+}
+
+export interface InstallModPayload {
+  module_id: string;
+  slot_idx: number;
+}
+
+export interface UninstallModPayload {
+  slot_idx: number;
+}
+
+// Faction management
+export interface FactionInvitePayload {
+  player_id: string;
+}
+
+export interface FactionKickPayload {
+  player_id: string;
+}
+
+export interface FactionPromotePayload {
+  player_id: string;
+  role_id: string;
+}
+
+export interface JoinFactionPayload {
+  faction_id: string;
+}
+
+// Forum delete
+export interface ForumDeleteThreadPayload {
+  thread_id: string;
+}
+
+export interface ForumDeleteReplyPayload {
+  reply_id: string;
 }

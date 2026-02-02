@@ -28,6 +28,24 @@ import type {
   POI,
   Base,
   NearbyPlayer,
+  CargoItem,
+  TradeOfferPayload,
+  TradeActionPayload,
+  ListItemPayload,
+  BuyListingPayload,
+  CancelListPayload,
+  LootWreckPayload,
+  SalvageWreckPayload,
+  BuyInsurancePayload,
+  BuyShipPayload,
+  InstallModPayload,
+  UninstallModPayload,
+  JoinFactionPayload,
+  FactionInvitePayload,
+  FactionKickPayload,
+  FactionPromotePayload,
+  ForumDeleteThreadPayload,
+  ForumDeleteReplyPayload,
 } from './types';
 
 export type EventHandler<T> = (data: T) => void;
@@ -391,6 +409,26 @@ export class SpaceMoltClient {
     this.send<CreateFactionPayload>('create_faction', { name, tag });
   }
 
+  joinFaction(factionId: string): void {
+    this.send<JoinFactionPayload>('join_faction', { faction_id: factionId });
+  }
+
+  leaveFaction(): void {
+    this.send('leave_faction');
+  }
+
+  factionInvite(playerId: string): void {
+    this.send<FactionInvitePayload>('faction_invite', { player_id: playerId });
+  }
+
+  factionKick(playerId: string): void {
+    this.send<FactionKickPayload>('faction_kick', { player_id: playerId });
+  }
+
+  factionPromote(playerId: string, roleId: string): void {
+    this.send<FactionPromotePayload>('faction_promote', { player_id: playerId, role_id: roleId });
+  }
+
   // Profile
 
   setStatus(statusMessage: string, clanTag: string): void {
@@ -403,6 +441,100 @@ export class SpaceMoltClient {
 
   setAnonymous(anonymous: boolean): void {
     this.send('set_anonymous', { anonymous });
+  }
+
+  // Player-to-player Trading
+
+  tradeOffer(
+    targetId: string,
+    offerItems: CargoItem[],
+    offerCredits: number,
+    requestItems: CargoItem[],
+    requestCredits: number
+  ): void {
+    this.send<TradeOfferPayload>('trade_offer', {
+      target_id: targetId,
+      offer_items: offerItems,
+      offer_credits: offerCredits,
+      request_items: requestItems,
+      request_credits: requestCredits,
+    });
+  }
+
+  tradeAccept(tradeId: string): void {
+    this.send<TradeActionPayload>('trade_accept', { trade_id: tradeId });
+  }
+
+  tradeDecline(tradeId: string): void {
+    this.send<TradeActionPayload>('trade_decline', { trade_id: tradeId });
+  }
+
+  tradeCancel(tradeId: string): void {
+    this.send<TradeActionPayload>('trade_cancel', { trade_id: tradeId });
+  }
+
+  getTrades(): void {
+    this.send('get_trades');
+  }
+
+  // Player Market
+
+  listItem(itemId: string, quantity: number, priceEach: number): void {
+    this.send<ListItemPayload>('list_item', { item_id: itemId, quantity, price_each: priceEach });
+  }
+
+  buyListing(listingId: string, quantity: number): void {
+    this.send<BuyListingPayload>('buy_listing', { listing_id: listingId, quantity });
+  }
+
+  cancelList(listingId: string): void {
+    this.send<CancelListPayload>('cancel_list', { listing_id: listingId });
+  }
+
+  getListings(): void {
+    this.send('get_listings');
+  }
+
+  // Wrecks
+
+  getWrecks(): void {
+    this.send('get_wrecks');
+  }
+
+  lootWreck(wreckId: string, itemId: string, quantity: number): void {
+    this.send<LootWreckPayload>('loot_wreck', { wreck_id: wreckId, item_id: itemId, quantity });
+  }
+
+  salvageWreck(wreckId: string): void {
+    this.send<SalvageWreckPayload>('salvage_wreck', { wreck_id: wreckId });
+  }
+
+  // Insurance
+
+  buyInsurance(coveragePercent: number): void {
+    this.send<BuyInsurancePayload>('buy_insurance', { coverage_percent: coveragePercent });
+  }
+
+  claimInsurance(): void {
+    this.send('claim_insurance');
+  }
+
+  setHomeBase(): void {
+    this.send('set_home_base');
+  }
+
+  // Ship Management
+
+  buyShip(shipClass: string): void {
+    this.send<BuyShipPayload>('buy_ship', { ship_class: shipClass });
+  }
+
+  installMod(moduleId: string, slotIdx: number): void {
+    this.send<InstallModPayload>('install_mod', { module_id: moduleId, slot_idx: slotIdx });
+  }
+
+  uninstallMod(slotIdx: number): void {
+    this.send<UninstallModPayload>('uninstall_mod', { slot_idx: slotIdx });
   }
 
   // Queries
@@ -421,6 +553,10 @@ export class SpaceMoltClient {
 
   getBase(): void {
     this.send('get_base');
+  }
+
+  getShip(): void {
+    this.send('get_ship');
   }
 
   getSkills(): void {
@@ -459,6 +595,14 @@ export class SpaceMoltClient {
     } else if (replyId) {
       this.send('forum_upvote', { reply_id: replyId });
     }
+  }
+
+  forumDeleteThread(threadId: string): void {
+    this.send<ForumDeleteThreadPayload>('forum_delete_thread', { thread_id: threadId });
+  }
+
+  forumDeleteReply(replyId: string): void {
+    this.send<ForumDeleteReplyPayload>('forum_delete_reply', { reply_id: replyId });
   }
 
   // Event handling
