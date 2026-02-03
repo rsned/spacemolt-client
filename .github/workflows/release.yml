@@ -58,6 +58,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history to find previous tags for release notes
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -85,11 +87,15 @@ jobs:
       - name: Send Discord notification
         run: |
           # Get release notes from commits since last tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          # Use --abbrev=0 to get the closest tag, then exclude current tag
+          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1)
           if [ -n "$PREV_TAG" ]; then
-            NOTES=$(git log --pretty=format:"• %s" $PREV_TAG..HEAD 2>/dev/null | head -10)
-          else
-            NOTES="• Initial release"
+            NOTES=$(git log --pretty=format:"• %s" $PREV_TAG..$CURRENT_TAG 2>/dev/null | head -10)
+          fi
+          # Fallback if no notes found
+          if [ -z "$NOTES" ]; then
+            NOTES="• Bug fixes and improvements"
           fi
 
           # Build Discord webhook payload
