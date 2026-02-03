@@ -293,6 +293,54 @@ function setupClientHandlers(): void {
   });
 }
 
+// Helper to wait for authentication response (logged_in, registered, or error)
+// Returns a promise that resolves with the server's response
+interface AuthResponse {
+  type: 'logged_in' | 'registered' | 'error';
+  data: unknown;
+}
+
+async function waitForAuthResponse(successEvent: 'logged_in' | 'registered'): Promise<{ promise: Promise<AuthResponse> }> {
+  const AUTH_TIMEOUT = 10000; // 10 seconds
+
+  let resolvePromise: (value: AuthResponse) => void;
+  let unsubSuccess: (() => void) | null = null;
+  let unsubError: (() => void) | null = null;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const promise = new Promise<AuthResponse>((resolve) => {
+    resolvePromise = resolve;
+
+    // Set up one-time handlers
+    unsubSuccess = client.on(successEvent, (data) => {
+      cleanup();
+      resolve({ type: successEvent, data });
+    });
+
+    unsubError = client.on<ErrorPayload>('error', (data) => {
+      cleanup();
+      resolve({ type: 'error', data });
+    });
+
+    // Timeout handler
+    timeoutId = setTimeout(() => {
+      cleanup();
+      resolve({
+        type: 'error',
+        data: { code: 'timeout', message: 'Server did not respond in time' },
+      });
+    }, AUTH_TIMEOUT);
+  });
+
+  function cleanup() {
+    if (unsubSuccess) unsubSuccess();
+    if (unsubError) unsubError();
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+
+  return { promise };
+}
+
 // Process a command from the CLI
 async function processCommand(request: IPCRequest): Promise<IPCResponse> {
   const { id, command, args } = request;
@@ -372,7 +420,29 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
           return { id, success: false, messages, error: 'Usage: register <username> <empire>' };
         }
         credentials = { username, token: '' };
+
+        // Wait for server response (registered or error)
+        const registerResult = await waitForAuthResponse('registered');
         client.register(username, empire as any);
+        const registerResponse = await registerResult.promise;
+
+        // Include the server response in messages
+        messages.push({
+          type: registerResponse.type as QueuedMessage['type'],
+          timestamp: Date.now(),
+          data: registerResponse.data,
+        });
+
+        if (registerResponse.type === 'error') {
+          return {
+            id,
+            success: false,
+            messages,
+            response: { action: 'register', username, empire },
+            error: (registerResponse.data as ErrorPayload).code,
+          };
+        }
+
         return { id, success: true, messages, response: { action: 'register', username, empire } };
       }
 
@@ -382,7 +452,29 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
           return { id, success: false, messages, error: 'Usage: login <username> <token>' };
         }
         await saveCredentials(username, token);
+
+        // Wait for server response (logged_in or error)
+        const loginResult = await waitForAuthResponse('logged_in');
         client.login(username, token);
+        const loginResponse = await loginResult.promise;
+
+        // Include the server response in messages
+        messages.push({
+          type: loginResponse.type as QueuedMessage['type'],
+          timestamp: Date.now(),
+          data: loginResponse.data,
+        });
+
+        if (loginResponse.type === 'error') {
+          return {
+            id,
+            success: false,
+            messages,
+            response: { action: 'login', username },
+            error: (loginResponse.data as ErrorPayload).code,
+          };
+        }
+
         return { id, success: true, messages, response: { action: 'login', username } };
       }
 
