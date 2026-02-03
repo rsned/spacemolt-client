@@ -581,19 +581,14 @@ export interface ForumDeleteReplyPayload {
 }
 
 // API Introspection - Dynamic command discovery
-export interface CommandParameter {
-  name: string;
-  type: 'string' | 'number' | 'boolean';
-  required: boolean;
-  description?: string;
-}
-
 export interface CommandInfo {
   name: string;           // e.g., "travel"
   description: string;    // e.g., "Travel to a POI within current system"
   category: string;       // e.g., "navigation", "combat", "trading"
-  parameters: CommandParameter[];
+  format: string;         // JSON format example
+  notes: string;          // Usage notes
   requires_auth: boolean; // whether player must be logged in
+  is_mutation: boolean;   // whether this is a game action (rate-limited)
 }
 
 export interface CommandsPayload {

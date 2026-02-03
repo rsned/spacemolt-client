@@ -149,6 +149,9 @@ function setupClientHandlers(): void {
     lastWelcome = data;
     queueMessage('welcome', data);
 
+    // Request command list for dynamic help generation
+    client.getCommands();
+
     // Auto-login if we have credentials
     if (credentials) {
       if (DEBUG) console.log(`[Daemon] Auto-logging in as ${credentials.username}...`);
@@ -870,16 +873,14 @@ function generateDynamicHelpText(): string {
     const categoryTitle = category.charAt(0).toUpperCase() + category.slice(1);
     helpText += `\n=== ${categoryTitle} ===\n`;
 
-    for (const cmd of commands) {
-      // Format parameters: <required> [optional]
-      const params = cmd.parameters
-        .map(p => p.required ? `<${p.name}>` : `[${p.name}]`)
-        .join(' ');
+    // Sort commands by name within category
+    commands.sort((a, b) => a.name.localeCompare(b.name));
 
-      const cmdWithParams = params ? `${cmd.name} ${params}` : cmd.name;
-      // Pad command to align descriptions
-      const padded = cmdWithParams.padEnd(30);
-      helpText += `  ${padded}${cmd.description}\n`;
+    for (const cmd of commands) {
+      // Pad command name to align descriptions
+      const padded = cmd.name.padEnd(25);
+      const mutation = cmd.is_mutation ? ' [action]' : '';
+      helpText += `  ${padded}${cmd.description}${mutation}\n`;
     }
   }
 
