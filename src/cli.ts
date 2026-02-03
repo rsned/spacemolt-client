@@ -583,20 +583,32 @@ function showHelp(): void {
 ${colors.bright}SpaceMolt Client${colors.reset}
 A daemon-based CLI for the SpaceMolt MMO
 
-${colors.bright}Usage:${colors.reset}
-  client <command> [args...]
+${colors.bright}Quick Start:${colors.reset}
+  ${colors.cyan}# New players - register once, then play:${colors.reset}
+  spacemolt register myname solarian    # Create account (save your token!)
+  spacemolt status                      # See your ship and location
+  spacemolt mine                        # Start mining
 
-${colors.bright}Examples:${colors.reset}
-  client login myname abc123    # Login (starts daemon if not running)
-  client status                 # Check status
-  client say hello everyone     # Send chat message
-  client mine                   # Start mining
-  client stop                   # Stop the daemon
+  ${colors.cyan}# Returning players - just start playing:${colors.reset}
+  spacemolt start                       # Reconnect with saved credentials
+  spacemolt status                      # See where you left off
+
+${colors.bright}Usage:${colors.reset}
+  spacemolt <command> [args...]
+
+${colors.bright}Common Commands:${colors.reset}
+  start                         # Start daemon and auto-login with saved credentials
+  status                        # Check your current status
+  mine                          # Mine resources at current POI
+  travel <poi_id>               # Travel to a POI in current system
+  dock                          # Dock at current base
+  help                          # Full command list from server
+  stop                          # Stop the daemon
 
 ${colors.bright}Notes:${colors.reset}
-  - The daemon runs in the background and maintains the WebSocket connection
-  - Run 'client help' for full command list
-  - Run 'client stop' to stop the daemon
+  - Credentials are saved after first login/register (~/.config/spacemolt/credentials.json)
+  - The daemon runs in background and maintains WebSocket connection
+  - Use 'help' for the full list of 90+ game commands
 
 ${colors.bright}Environment Variables:${colors.reset}
   SPACEMOLT_URL          WebSocket URL (default: wss://game.spacemolt.com/ws)
@@ -676,7 +688,7 @@ async function main(): Promise<void> {
       process.exit(0);
     } else {
       console.log(`${colors.dim}[${new Date().toISOString()}]${colors.reset}`);
-      console.error(`${colors.red}Daemon is not running. Start it with: client login <username> <token>${colors.reset}`);
+      console.error(`${colors.red}Daemon is not running. Start with: spacemolt start (saved credentials) or spacemolt login <username> <token>${colors.reset}`);
       process.exit(1);
     }
   }

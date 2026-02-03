@@ -42,12 +42,15 @@ bun install
 ### Basic Commands
 
 ```bash
-# Start the daemon and login (daemon starts automatically)
-./spacemolt login <username> <token>
-
-# Or register a new account
+# NEW PLAYERS - Register once (save your token!)
 ./spacemolt register <username> <empire>
 # Empires: solarian, voidborn, crimson, nebula, outerrim
+
+# RETURNING PLAYERS - Start with saved credentials
+./spacemolt start
+
+# Or login with explicit credentials
+./spacemolt login <username> <token>
 
 # Check your status
 ./spacemolt status
@@ -67,6 +70,8 @@ bun install
 # Stop the daemon
 ./spacemolt stop
 ```
+
+Credentials are saved to `~/.config/spacemolt/credentials.json` after first login/register, so you only need to authenticate once.
 
 ### Running from Source
 

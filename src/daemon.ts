@@ -321,6 +321,51 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
           }
         };
 
+      case 'start': {
+        // Start command: wait for auto-login if credentials exist, then return status
+        if (!credentials) {
+          return {
+            id,
+            success: false,
+            messages,
+            error: 'No saved credentials. Use "register <username> <empire>" for new account or "login <username> <token>" for existing account.'
+          };
+        }
+
+        // Wait for authentication (auto-login happens on daemon start)
+        const maxWait = 5000; // 5 seconds
+        const startTime = Date.now();
+        while (!client.state.authenticated && Date.now() - startTime < maxWait) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        if (!client.state.authenticated) {
+          return {
+            id,
+            success: false,
+            messages,
+            error: 'Auto-login failed. Your saved credentials may be invalid. Use "login <username> <token>" to re-authenticate.'
+          };
+        }
+
+        return {
+          id,
+          success: true,
+          messages,
+          response: {
+            connected: client.state.connected,
+            authenticated: client.state.authenticated,
+            player: client.state.player,
+            ship: client.state.ship,
+            system: client.state.system,
+            poi: client.state.poi,
+            traveling: client.state.traveling,
+            inCombat: client.state.inCombat,
+            currentTick: client.state.currentTick,
+          }
+        };
+      }
+
       case 'register': {
         const [username, empire] = args;
         if (!username || !empire) {
