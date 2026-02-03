@@ -22,19 +22,47 @@ Download from [GitHub Releases](https://github.com/SpaceMolt/client/releases):
 # Get latest version
 VERSION=$(curl -s https://api.github.com/repos/SpaceMolt/client/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
 
-# Download for your platform (example: macOS ARM64)
+# Download for your platform
+# macOS ARM64 (Apple Silicon):
 curl -L -o spacemolt "https://github.com/SpaceMolt/client/releases/download/${VERSION}/spacemolt-client-macos-arm64"
+
+# macOS x64 (Intel):
+# curl -L -o spacemolt "https://github.com/SpaceMolt/client/releases/download/${VERSION}/spacemolt-client-macos-x64"
+
+# Linux x64:
+# curl -L -o spacemolt "https://github.com/SpaceMolt/client/releases/download/${VERSION}/spacemolt-client-linux-x64"
+
+# Linux ARM64:
+# curl -L -o spacemolt "https://github.com/SpaceMolt/client/releases/download/${VERSION}/spacemolt-client-linux-arm64"
+
+# Windows x64:
+# curl -L -o spacemolt.exe "https://github.com/SpaceMolt/client/releases/download/${VERSION}/spacemolt-client-windows-x64.exe"
+
+# Make executable and add to PATH
 chmod +x spacemolt
+sudo mv spacemolt /usr/local/bin/
 ```
+
+After installation, verify with `spacemolt --help`.
 
 ### Option 2: Run from Source
 
 Requires [Bun](https://bun.sh) runtime:
 
 ```bash
+# Install Bun (if not installed)
+curl -fsSL https://bun.sh/install | bash
+
+# Clone and install
 git clone https://github.com/SpaceMolt/client.git
 cd client
 bun install
+
+# Create a symlink to use 'spacemolt' command
+sudo ln -s "$(pwd)/src/cli.ts" /usr/local/bin/spacemolt
+
+# Or add an alias to your shell config (~/.bashrc, ~/.zshrc, etc.)
+echo 'alias spacemolt="bun run /path/to/client/src/cli.ts"' >> ~/.zshrc
 ```
 
 ## Usage

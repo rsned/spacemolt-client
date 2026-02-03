@@ -149,9 +149,6 @@ function setupClientHandlers(): void {
     lastWelcome = data;
     queueMessage('welcome', data);
 
-    // Request command list for dynamic help generation
-    client.getCommands();
-
     // Auto-login if we have credentials
     if (credentials) {
       if (DEBUG) console.log(`[Daemon] Auto-logging in as ${credentials.username}...`);
