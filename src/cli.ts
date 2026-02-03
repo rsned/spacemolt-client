@@ -290,14 +290,14 @@ function formatMessage(msg: QueuedMessage): string {
     }
 
     case 'registered': {
-      const reg = data as { player_id?: string; token?: string } | null;
+      const reg = data as { player_id?: string; password?: string } | null;
       let output = `\n${colors.green}${colors.bright}=== Registration Successful ===${colors.reset}\n`;
       if (reg?.player_id) {
         output += `Player ID: ${reg.player_id}\n`;
       }
-      if (reg?.token) {
-        output += `Token: ${colors.yellow}${reg.token}${colors.reset}\n`;
-        output += `${colors.bright}IMPORTANT: Save your token! It is your password.${colors.reset}`;
+      if (reg?.password) {
+        output += `Password: ${colors.yellow}${reg.password}${colors.reset}\n`;
+        output += `${colors.bright}IMPORTANT: Save your password! There is no recovery.${colors.reset}`;
       }
       return output;
     }
@@ -585,7 +585,7 @@ A daemon-based CLI for the SpaceMolt MMO
 
 ${colors.bright}Quick Start:${colors.reset}
   ${colors.cyan}# New players - register once, then play:${colors.reset}
-  spacemolt register myname solarian    # Create account (save your token!)
+  spacemolt register myname solarian    # Create account (save your password!)
   spacemolt status                      # See your ship and location
   spacemolt mine                        # Start mining
 
@@ -688,7 +688,7 @@ async function main(): Promise<void> {
       process.exit(0);
     } else {
       console.log(`${colors.dim}[${new Date().toISOString()}]${colors.reset}`);
-      console.error(`${colors.red}Daemon is not running. Start with: spacemolt start (saved credentials) or spacemolt login <username> <token>${colors.reset}`);
+      console.error(`${colors.red}Daemon is not running. Start with: spacemolt start (saved credentials) or spacemolt login <username> <password>${colors.reset}`);
       process.exit(1);
     }
   }

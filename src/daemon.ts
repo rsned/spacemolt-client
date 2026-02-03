@@ -86,7 +86,7 @@ export interface QueuedMessage {
 // Daemon state
 let client: SpaceMoltClient;
 let messageQueue: QueuedMessage[] = [];
-let credentials: { username: string; token: string } | null = null;
+let credentials: { username: string; password: string } | null = null;
 let unixServer: ReturnType<typeof Bun.listen> | null = null;
 let isShuttingDown = false;
 let welcomeReceived = false;
@@ -110,8 +110,8 @@ async function loadCredentials(): Promise<void> {
 }
 
 // Save credentials
-async function saveCredentials(username: string, token: string): Promise<void> {
-  credentials = { username, token };
+async function saveCredentials(username: string, password: string): Promise<void> {
+  credentials = { username, password };
   // Ensure parent directory exists
   const parentDir = path.dirname(CREDENTIALS_PATH);
   if (!fs.existsSync(parentDir)) {
@@ -155,7 +155,7 @@ function setupClientHandlers(): void {
     // Auto-login if we have credentials
     if (credentials) {
       if (DEBUG) console.log(`[Daemon] Auto-logging in as ${credentials.username}...`);
-      client.login(credentials.username, credentials.token);
+      client.login(credentials.username, credentials.password);
     }
   });
 
@@ -180,7 +180,7 @@ function setupClientHandlers(): void {
 
     // Save credentials if we have the username
     if (credentials?.username) {
-      saveCredentials(credentials.username, data.token);
+      saveCredentials(credentials.username, data.password);
     }
   });
 
@@ -376,7 +376,7 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
             id,
             success: false,
             messages,
-            error: 'No saved credentials. Use "register <username> <empire>" for new account or "login <username> <token>" for existing account.'
+            error: 'No saved credentials. Use "register <username> <empire>" for new account or "login <username> <password>" for existing account.'
           };
         }
 
@@ -392,7 +392,7 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
             id,
             success: false,
             messages,
-            error: 'Auto-login failed. Your saved credentials may be invalid. Use "login <username> <token>" to re-authenticate.'
+            error: 'Auto-login failed. Your saved credentials may be invalid. Use "login <username> <password>" to re-authenticate.'
           };
         }
 
@@ -419,7 +419,7 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!username || !empire) {
           return { id, success: false, messages, error: 'Usage: register <username> <empire>' };
         }
-        credentials = { username, token: '' };
+        credentials = { username, password: '' };
 
         // Wait for server response (registered or error)
         const registerResult = await waitForAuthResponse('registered');
@@ -447,15 +447,15 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
       }
 
       case 'login': {
-        const [username, token] = args;
-        if (!username || !token) {
-          return { id, success: false, messages, error: 'Usage: login <username> <token>' };
+        const [username, password] = args;
+        if (!username || !password) {
+          return { id, success: false, messages, error: 'Usage: login <username> <password>' };
         }
-        await saveCredentials(username, token);
+        await saveCredentials(username, password);
 
         // Wait for server response (logged_in or error)
         const loginResult = await waitForAuthResponse('logged_in');
-        client.login(username, token);
+        client.login(username, password);
         const loginResponse = await loginResult.promise;
 
         // Include the server response in messages
@@ -987,7 +987,7 @@ SpaceMolt Client (Daemon Mode)
 
 Connection Commands:
   register <username> <empire>  - Create new account (empires: solarian, voidborn, crimson, nebula, outerrim)
-  login <username> <token>      - Login to existing account
+  login <username> <password>   - Login to existing account
   logout                        - Logout
 
 Navigation:

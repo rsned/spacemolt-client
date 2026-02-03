@@ -22,14 +22,14 @@ describe('Daemon Command Synchronization', () => {
       // so this is a documentation of the expected behavior.
 
       // Current buggy behavior:
-      // 1. CLI sends: login invalid_user wrong_token
+      // 1. CLI sends: login invalid_user wrong_password
       // 2. Daemon returns: { success: true, messages: [], response: { action: 'login', username: 'invalid_user' } }
       // 3. Server sends error: { type: 'error', payload: { code: 'username_not_found', message: '...' } }
       // 4. Error is QUEUED in messageQueue
       // 5. Next CLI command (any command) returns: { success: true, messages: [{ type: 'error', ... }], ... }
 
       // Expected correct behavior:
-      // 1. CLI sends: login invalid_user wrong_token
+      // 1. CLI sends: login invalid_user wrong_password
       // 2. Daemon sends to server and WAITS for response
       // 3. Server sends error: { type: 'error', payload: { code: 'username_not_found', ... } }
       // 4. Daemon returns: { success: false, messages: [{ type: 'error', ... }], error: 'username_not_found' }
@@ -40,7 +40,7 @@ describe('Daemon Command Synchronization', () => {
 
     test('login with valid credentials should return logged_in in same response', async () => {
       // Expected behavior:
-      // 1. CLI sends: login valid_user correct_token
+      // 1. CLI sends: login valid_user correct_password
       // 2. Daemon sends to server and WAITS for response
       // 3. Server sends: { type: 'logged_in', payload: { player: {...}, ... } }
       // 4. Daemon returns: { success: true, messages: [{ type: 'logged_in', ... }], response: { action: 'login' } }
@@ -60,11 +60,11 @@ describe('Daemon Command Synchronization', () => {
       expect(true).toBe(true);
     });
 
-    test('register success should return token in same response', async () => {
+    test('register success should return password in same response', async () => {
       // Expected behavior:
       // 1. CLI sends: register new_username solarian
       // 2. Daemon sends to server and WAITS for response
-      // 3. Server sends: { type: 'registered', payload: { token: '...', player_id: '...' } }
+      // 3. Server sends: { type: 'registered', payload: { password: '...', player_id: '...' } }
       // 4. Daemon returns: { success: true, messages: [{ type: 'registered', ... }], response: { action: 'register' } }
 
       expect(true).toBe(true);
@@ -86,8 +86,8 @@ describe('Daemon Synchronization Integration', () => {
     constructor() {
       // Default handlers that simulate the real server
       this.handlers.set('login', (payload) => {
-        const { username, token } = payload;
-        if (username === 'valid_user' && token === 'valid_token') {
+        const { username, password } = payload;
+        if (username === 'valid_user' && password === 'valid_password') {
           return { type: 'logged_in', payload: { player: { username, id: 'p1' } } };
         }
         return { type: 'error', payload: { code: 'username_not_found', message: `No player found with username '${username}'` } };
@@ -98,7 +98,7 @@ describe('Daemon Synchronization Integration', () => {
         if (username === 'taken_username') {
           return { type: 'error', payload: { code: 'username_taken', message: 'Username already taken' } };
         }
-        return { type: 'registered', payload: { token: 'new_token_123', player_id: 'p2' } };
+        return { type: 'registered', payload: { password: 'new_password_123', player_id: 'p2' } };
       });
     }
 
@@ -146,11 +146,11 @@ describe('Daemon Synchronization Integration', () => {
     }
 
     // Current buggy implementation - returns immediately without waiting
-    async processLoginBuggy(username: string, token: string): Promise<IPCResponse> {
+    async processLoginBuggy(username: string, password: string): Promise<IPCResponse> {
       const messages = this.flushMessages();
 
       // Send to server (fire and forget - THE BUG!)
-      this.server.receiveMessage({ type: 'login', payload: { username, token } });
+      this.server.receiveMessage({ type: 'login', payload: { username, password } });
 
       // Return immediately without waiting for response
       return {
@@ -162,7 +162,7 @@ describe('Daemon Synchronization Integration', () => {
     }
 
     // Fixed implementation - waits for server response
-    async processLoginFixed(username: string, token: string): Promise<IPCResponse> {
+    async processLoginFixed(username: string, password: string): Promise<IPCResponse> {
       const messages = this.flushMessages();
 
       // Create a promise that waits for the server response
@@ -175,7 +175,7 @@ describe('Daemon Synchronization Integration', () => {
       });
 
       // Send to server
-      this.server.receiveMessage({ type: 'login', payload: { username, token } });
+      this.server.receiveMessage({ type: 'login', payload: { username, password } });
 
       // Wait for response with timeout
       const serverResponse = await Promise.race([
@@ -208,7 +208,7 @@ describe('Daemon Synchronization Integration', () => {
     const daemon = new BuggyDaemon(server);
 
     // First command: login with invalid credentials
-    const response1 = await daemon.processLoginBuggy('invalid_user', 'wrong_token');
+    const response1 = await daemon.processLoginBuggy('invalid_user', 'wrong_password');
 
     // BUG: Response shows success even though login will fail
     expect(response1.success).toBe(true);
@@ -230,7 +230,7 @@ describe('Daemon Synchronization Integration', () => {
     const daemon = new BuggyDaemon(server);
 
     // Login with invalid credentials using fixed implementation
-    const response = await daemon.processLoginFixed('invalid_user', 'wrong_token');
+    const response = await daemon.processLoginFixed('invalid_user', 'wrong_password');
 
     // FIXED: Response correctly shows failure
     expect(response.success).toBe(false);
@@ -248,7 +248,7 @@ describe('Daemon Synchronization Integration', () => {
     const daemon = new BuggyDaemon(server);
 
     // Login with valid credentials
-    const response = await daemon.processLoginFixed('valid_user', 'valid_token');
+    const response = await daemon.processLoginFixed('valid_user', 'valid_password');
 
     // Success!
     expect(response.success).toBe(true);

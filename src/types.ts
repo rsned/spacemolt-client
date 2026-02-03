@@ -342,13 +342,13 @@ export interface RegisterPayload {
 }
 
 export interface RegisteredPayload {
-  token: string;
+  password: string;  // Formerly called "token"
   player_id: string;
 }
 
 export interface LoginPayload {
   username: string;
-  token: string;
+  password: string;  // Formerly called "token"
 }
 
 export interface LoggedInPayload {

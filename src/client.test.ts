@@ -95,18 +95,18 @@ describe('SpaceMoltClient', () => {
     test('login sends correct message and saves credentials', () => {
       const { client, messages } = createMockClient();
 
-      client.login('testuser', 'secret-token-123');
+      client.login('testuser', 'secret-password-123');
 
       expect(messages).toHaveLength(1);
       expect(messages[0]).toEqual({
         type: 'login',
-        payload: { username: 'testuser', token: 'secret-token-123' },
+        payload: { username: 'testuser', password: 'secret-password-123' },
       });
 
       // Verify credentials are saved
       expect(client.getSavedCredentials()).toEqual({
         username: 'testuser',
-        token: 'secret-token-123',
+        password: 'secret-password-123',
       });
     });
 
@@ -117,7 +117,7 @@ describe('SpaceMoltClient', () => {
       client.state.authenticated = true;
       client.state.player = { id: 'p1', username: 'test' } as any;
       client.state.ship = { id: 's1' } as any;
-      client.login('testuser', 'token');
+      client.login('testuser', 'password');
 
       messages.length = 0; // Clear login message
 
@@ -134,7 +134,7 @@ describe('SpaceMoltClient', () => {
     test('clearCredentials removes saved credentials', () => {
       const { client } = createMockClient();
 
-      client.login('testuser', 'token');
+      client.login('testuser', 'password');
       expect(client.getSavedCredentials()).not.toBeNull();
 
       client.clearCredentials();
@@ -1044,7 +1044,7 @@ describe('SpaceMoltClient', () => {
       client.on('registered', handler);
 
       const payload: RegisteredPayload = {
-        token: 'secret-token',
+        password: 'secret-password',
         player_id: 'player-123',
       };
 

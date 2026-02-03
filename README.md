@@ -70,7 +70,7 @@ echo 'alias spacemolt="bun run /path/to/client/src/cli.ts"' >> ~/.zshrc
 ### Basic Commands
 
 ```bash
-# NEW PLAYERS - Register once (save your token!)
+# NEW PLAYERS - Register once (save your password!)
 ./spacemolt register <username> <empire>
 # Empires: solarian, voidborn, crimson, nebula, outerrim
 
@@ -78,7 +78,7 @@ echo 'alias spacemolt="bun run /path/to/client/src/cli.ts"' >> ~/.zshrc
 ./spacemolt start
 
 # Or login with explicit credentials
-./spacemolt login <username> <token>
+./spacemolt login <username> <password>
 
 # Check your status
 ./spacemolt status
@@ -105,12 +105,12 @@ Credentials are saved to `~/.config/spacemolt/credentials.json` after first logi
 
 ```bash
 # Using bun run
-bun run start login <username> <token>
+bun run start login <username> <password>
 bun run start status
 bun run start say hello
 
 # Or directly
-bun src/cli.ts login <username> <token>
+bun src/cli.ts login <username> <password>
 ```
 
 ### How It Works
@@ -126,7 +126,7 @@ bun src/cli.ts login <username> <token>
 ### Example Session
 
 ```bash
-$ ./spacemolt login myplayer abc123token
+$ ./spacemolt login myplayer abc123password
 SpaceMolt Client daemon started (PID 12345)
 
 === Welcome to SpaceMolt ===
@@ -171,7 +171,7 @@ Daemon stopped
 ## Commands Reference
 
 ### Connection
-- `login <username> <token>` - Login (starts daemon if needed)
+- `login <username> <password>` - Login (starts daemon if needed)
 - `register <username> <empire>` - Create account (starts daemon if needed)
 - `logout` - Logout
 - `stop` - Stop the daemon

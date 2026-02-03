@@ -86,7 +86,7 @@ export class SpaceMoltClient {
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private messageQueue: Message[] = [];
   private reconnectAttempts: number = 0;
-  private savedCredentials: { username: string; token: string } | null = null;
+  private savedCredentials: { username: string; password: string } | null = null;
 
   public state: ClientState = {
     connected: false,
@@ -187,7 +187,7 @@ export class SpaceMoltClient {
   }
 
   // Get saved credentials for auto-relogin
-  getSavedCredentials(): { username: string; token: string } | null {
+  getSavedCredentials(): { username: string; password: string } | null {
     return this.savedCredentials;
   }
 
@@ -318,9 +318,9 @@ export class SpaceMoltClient {
     this.send<RegisterPayload>('register', { username, empire });
   }
 
-  login(username: string, token: string): void {
-    this.savedCredentials = { username, token };
-    this.send<LoginPayload>('login', { username, token });
+  login(username: string, password: string): void {
+    this.savedCredentials = { username, password };
+    this.send<LoginPayload>('login', { username, password });
   }
 
   logout(): void {
