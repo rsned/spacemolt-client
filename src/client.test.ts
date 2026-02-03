@@ -1356,4 +1356,38 @@ describe('SpaceMoltClient', () => {
       }).not.toThrow();
     });
   });
+
+  describe('API Introspection', () => {
+    test('getCommands sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.getCommands();
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({ type: 'get_commands', payload: undefined });
+    });
+
+    test('handleMessage routes commands to event', () => {
+      const client = new SpaceMoltClient({ url: 'ws://localhost:8080/ws' });
+      const handler = mock(() => {});
+      client.on('commands', handler);
+
+      const payload = {
+        commands: [
+          {
+            name: 'travel',
+            description: 'Travel to a POI',
+            category: 'navigation',
+            parameters: [{ name: 'poi_id', type: 'string', required: true }],
+            requires_auth: true,
+          },
+        ],
+      };
+
+      const message = JSON.stringify({ type: 'commands', payload });
+      (client as any).handleMessage(message);
+
+      expect(handler).toHaveBeenCalledWith(payload);
+    });
+  });
 });

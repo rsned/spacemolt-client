@@ -46,6 +46,7 @@ import type {
   FactionPromotePayload,
   ForumDeleteThreadPayload,
   ForumDeleteReplyPayload,
+  CommandsPayload,
 } from './types';
 
 export type EventHandler<T> = (data: T) => void;
@@ -229,6 +230,9 @@ export class SpaceMoltClient {
           break;
         case 'version_info':
           this.emit('version_info', msg.payload);
+          break;
+        case 'commands':
+          this.emit('commands', msg.payload as CommandsPayload);
           break;
         default:
           this.emit(msg.type, msg.payload);
@@ -569,6 +573,10 @@ export class SpaceMoltClient {
 
   getVersion(): void {
     this.send('get_version');
+  }
+
+  getCommands(): void {
+    this.send('get_commands');
   }
 
   // Forum

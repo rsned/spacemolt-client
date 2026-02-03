@@ -311,7 +311,10 @@ export type MessageType =
   | 'forum_reply'
   | 'forum_upvote'
   | 'forum_delete_thread'
-  | 'forum_delete_reply';
+  | 'forum_delete_reply'
+  // API introspection
+  | 'get_commands'
+  | 'commands';
 
 export interface Message<T = unknown> {
   type: MessageType;
@@ -574,4 +577,24 @@ export interface ForumDeleteThreadPayload {
 
 export interface ForumDeleteReplyPayload {
   reply_id: string;
+}
+
+// API Introspection - Dynamic command discovery
+export interface CommandParameter {
+  name: string;
+  type: 'string' | 'number' | 'boolean';
+  required: boolean;
+  description?: string;
+}
+
+export interface CommandInfo {
+  name: string;           // e.g., "travel"
+  description: string;    // e.g., "Travel to a POI within current system"
+  category: string;       // e.g., "navigation", "combat", "trading"
+  parameters: CommandParameter[];
+  requires_auth: boolean; // whether player must be logged in
+}
+
+export interface CommandsPayload {
+  commands: CommandInfo[];
 }

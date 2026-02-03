@@ -12,16 +12,26 @@ import * as os from 'os';
 import { spawn } from 'child_process';
 import type { IPCRequest, IPCResponse, QueuedMessage } from './daemon';
 
+// Get a unique user identifier that works cross-platform
+function getUserIdentifier(): string {
+  // On Unix-like systems, use getuid if available
+  if (typeof process.getuid === 'function') {
+    return String(process.getuid());
+  }
+  // On Windows, use USERNAME environment variable or os.userInfo().username
+  return process.env.USERNAME || os.userInfo().username || 'default';
+}
+
 // Get socket path (must match daemon)
 function getSocketPath(): string {
   const runtimeDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
-  return path.join(runtimeDir, `spacemolt-${process.getuid()}.sock`);
+  return path.join(runtimeDir, `spacemolt-${getUserIdentifier()}.sock`);
 }
 
 // Get PID file path (must match daemon)
 function getPidPath(): string {
   const runtimeDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
-  return path.join(runtimeDir, `spacemolt-${process.getuid()}.pid`);
+  return path.join(runtimeDir, `spacemolt-${getUserIdentifier()}.pid`);
 }
 
 const SOCKET_PATH = getSocketPath();
@@ -193,131 +203,240 @@ async function sendCommand(command: string, args: string[]): Promise<IPCResponse
 // Format a queued message for display
 function formatMessage(msg: QueuedMessage): string {
   const timestamp = new Date(msg.timestamp).toLocaleTimeString();
+  const data = msg.data as Record<string, unknown> | null | undefined;
+
+  // Helper to extract a displayable message from common payload fields
+  function extractMessage(payload: Record<string, unknown> | null | undefined): string | null {
+    if (!payload) return null;
+    // Try common message field names in order of preference
+    for (const field of ['message', 'content', 'text', 'description', 'info']) {
+      if (typeof payload[field] === 'string') {
+        return payload[field] as string;
+      }
+    }
+    // Try to find a 'data' field that might contain a message
+    if (payload.data && typeof payload.data === 'object') {
+      const nestedData = payload.data as Record<string, unknown>;
+      for (const field of ['message', 'content', 'text', 'description', 'info']) {
+        if (typeof nestedData[field] === 'string') {
+          return nestedData[field] as string;
+        }
+      }
+    }
+    return null;
+  }
+
+  // Helper to format type name for display (snake_case -> SNAKE_CASE)
+  function formatTypeName(type: string): string {
+    return type.toUpperCase().replace(/-/g, '_');
+  }
 
   switch (msg.type) {
     case 'chat': {
-      const chat = msg.data as { channel: string; sender: string; content: string };
-      const channelColor = chat.channel === 'local' ? colors.white :
-                          chat.channel === 'faction' ? colors.green :
-                          chat.channel === 'private' ? colors.magenta : colors.cyan;
-      return `${colors.dim}[${timestamp}]${colors.reset} ${channelColor}[${chat.channel}]${colors.reset} ${colors.bright}${chat.sender}${colors.reset}: ${chat.content}`;
+      const chat = data as { channel?: string; sender?: string; content?: string } | null;
+      const channel = chat?.channel || 'unknown';
+      const sender = chat?.sender || 'Unknown';
+      const content = chat?.content || '';
+      const channelColor = channel === 'local' ? colors.white :
+                          channel === 'faction' ? colors.green :
+                          channel === 'private' ? colors.magenta : colors.cyan;
+      return `${colors.dim}[${timestamp}]${colors.reset} ${channelColor}[${channel}]${colors.reset} ${colors.bright}${sender}${colors.reset}: ${content}`;
     }
 
     case 'system': {
-      const sys = msg.data as { message: string };
-      return `${colors.dim}[${timestamp}]${colors.reset} ${colors.yellow}[SYSTEM]${colors.reset} ${sys.message}`;
+      const message = extractMessage(data) || '';
+      return `${colors.dim}[${timestamp}]${colors.reset} ${colors.yellow}[SYSTEM]${colors.reset} ${message}`;
     }
 
     case 'error': {
-      const err = msg.data as { code: string; message: string };
-      return `${colors.dim}[${timestamp}]${colors.reset} ${colors.red}[ERROR ${err.code}]${colors.reset} ${err.message}`;
+      const err = data as { code?: string; message?: string } | null;
+      const code = err?.code || 'UNKNOWN';
+      const message = err?.message || extractMessage(data) || 'An error occurred';
+      return `${colors.dim}[${timestamp}]${colors.reset} ${colors.red}[ERROR ${code}]${colors.reset} ${message}`;
+    }
+
+    case 'tip': {
+      const message = extractMessage(data) || '';
+      return `${colors.dim}[${timestamp}]${colors.reset} ${colors.cyan}[TIP]${colors.reset} ${message}`;
+    }
+
+    case 'broadcast': {
+      const message = extractMessage(data) || '';
+      return `${colors.dim}[${timestamp}]${colors.reset} ${colors.bright}${colors.yellow}[BROADCAST]${colors.reset} ${message}`;
     }
 
     case 'welcome': {
-      const welcome = msg.data as { version: string; release_date: string; motd?: string; tick_rate: number; current_tick: number; release_notes?: string[] };
+      const welcome = data as { version?: string; release_date?: string; motd?: string; tick_rate?: number; current_tick?: number; release_notes?: string[] } | null;
       let output = `\n${colors.bright}${colors.cyan}=== Welcome to SpaceMolt ===${colors.reset}\n`;
-      output += `Version: ${welcome.version} (${welcome.release_date})\n`;
-      if (welcome.release_notes && welcome.release_notes.length > 0) {
+      if (welcome?.version) {
+        output += `Version: ${welcome.version}${welcome.release_date ? ` (${welcome.release_date})` : ''}\n`;
+      }
+      if (welcome?.release_notes && welcome.release_notes.length > 0) {
         output += '\nRelease Notes:\n';
         for (const note of welcome.release_notes) {
           output += `  - ${note}\n`;
         }
       }
-      if (welcome.motd) {
+      if (welcome?.motd) {
         output += `\nMOTD: ${welcome.motd}\n`;
       }
-      output += `Tick Rate: ${welcome.tick_rate}s | Current Tick: ${welcome.current_tick}`;
+      if (welcome?.tick_rate !== undefined) {
+        output += `Tick Rate: ${welcome.tick_rate}s`;
+        if (welcome.current_tick !== undefined) {
+          output += ` | Current Tick: ${welcome.current_tick}`;
+        }
+      }
       return output;
     }
 
     case 'registered': {
-      const reg = msg.data as { player_id: string; token: string };
-      return `\n${colors.green}${colors.bright}=== Registration Successful ===${colors.reset}\n` +
-             `Player ID: ${reg.player_id}\n` +
-             `Token: ${colors.yellow}${reg.token}${colors.reset}\n` +
-             `${colors.bright}IMPORTANT: Save your token! It is your password.${colors.reset}`;
+      const reg = data as { player_id?: string; token?: string } | null;
+      let output = `\n${colors.green}${colors.bright}=== Registration Successful ===${colors.reset}\n`;
+      if (reg?.player_id) {
+        output += `Player ID: ${reg.player_id}\n`;
+      }
+      if (reg?.token) {
+        output += `Token: ${colors.yellow}${reg.token}${colors.reset}\n`;
+        output += `${colors.bright}IMPORTANT: Save your token! It is your password.${colors.reset}`;
+      }
+      return output;
     }
 
     case 'logged_in': {
-      const login = msg.data as {
-        player: { username: string; empire: string; credits: number };
-        system: { name: string };
-        poi: { name: string };
-      };
-      return `\n${colors.green}${colors.bright}=== Logged In ===${colors.reset}\n` +
-             `Welcome, ${colors.bright}${login.player.username}${colors.reset}!\n` +
-             `Empire: ${login.player.empire}\n` +
-             `Credits: ${login.player.credits}\n` +
-             `Location: ${login.system.name} - ${login.poi.name}`;
+      const login = data as {
+        player?: { username?: string; empire?: string; credits?: number };
+        system?: { name?: string };
+        poi?: { name?: string };
+      } | null;
+      let output = `\n${colors.green}${colors.bright}=== Logged In ===${colors.reset}\n`;
+      if (login?.player?.username) {
+        output += `Welcome, ${colors.bright}${login.player.username}${colors.reset}!\n`;
+      }
+      if (login?.player?.empire) {
+        output += `Empire: ${login.player.empire}\n`;
+      }
+      if (login?.player?.credits !== undefined) {
+        output += `Credits: ${login.player.credits}\n`;
+      }
+      if (login?.system?.name || login?.poi?.name) {
+        output += `Location: ${login?.system?.name || 'Unknown'} - ${login?.poi?.name || 'Unknown'}`;
+      }
+      return output;
     }
 
     case 'ok': {
-      const ok = msg.data as Record<string, unknown>;
+      const ok = data as Record<string, unknown> | null;
+      if (!ok) {
+        return `${colors.green}[OK]${colors.reset}`;
+      }
       if (ok.action === 'mine' && ok.ore_type && ok.quantity) {
         return `${colors.green}[OK]${colors.reset} Mined ${ok.quantity}x ${ok.ore_type}`;
       }
       if (ok.action === 'buy' || ok.action === 'sell') {
-        return `${colors.green}[OK]${colors.reset} ${ok.action}: ${ok.item}x${ok.quantity} for ${ok.cost || ok.earned} credits`;
+        return `${colors.green}[OK]${colors.reset} ${ok.action}: ${ok.item || 'item'}x${ok.quantity || '?'} for ${ok.cost || ok.earned || '?'} credits`;
       }
       if (ok.action === 'travel') {
-        return `${colors.green}[OK]${colors.reset} Travel started, arriving at tick ${ok.arrival_tick}`;
+        return `${colors.green}[OK]${colors.reset} Travel started${ok.arrival_tick ? `, arriving at tick ${ok.arrival_tick}` : ''}`;
       }
       if (ok.action === 'arrived') {
-        return `${colors.green}[OK]${colors.reset} Arrived at ${ok.poi}`;
+        return `${colors.green}[OK]${colors.reset} Arrived${ok.poi ? ` at ${ok.poi}` : ''}`;
       }
       if (ok.action) {
         return `${colors.green}[OK]${colors.reset} ${ok.action}`;
+      }
+      // Try to extract a message for generic ok responses
+      const message = extractMessage(ok);
+      if (message) {
+        return `${colors.green}[OK]${colors.reset} ${message}`;
       }
       return `${colors.green}[OK]${colors.reset} ${JSON.stringify(ok)}`;
     }
 
     case 'state_update': {
-      const state = msg.data as {
-        tick: number;
+      const state = data as {
+        tick?: number;
         in_combat?: boolean;
-        ship?: { hull: number; max_hull: number; shield: number; max_shield: number };
+        ship?: { hull?: number; max_hull?: number; shield?: number; max_shield?: number };
         travel_progress?: number;
         travel_destination?: string;
-      };
-      if (state.in_combat && state.ship) {
-        return `${colors.red}[COMBAT Tick ${state.tick}]${colors.reset} Hull: ${state.ship.hull}/${state.ship.max_hull} Shield: ${state.ship.shield}/${state.ship.max_shield}`;
+      } | null;
+      if (state?.in_combat && state.ship) {
+        const hull = state.ship.hull ?? '?';
+        const maxHull = state.ship.max_hull ?? '?';
+        const shield = state.ship.shield ?? '?';
+        const maxShield = state.ship.max_shield ?? '?';
+        return `${colors.red}[COMBAT${state.tick !== undefined ? ` Tick ${state.tick}` : ''}]${colors.reset} Hull: ${hull}/${maxHull} Shield: ${shield}/${maxShield}`;
       }
-      if (state.travel_progress !== undefined) {
+      if (state?.travel_progress !== undefined) {
         const percent = Math.round(state.travel_progress * 100);
-        return `${colors.blue}[TRAVEL]${colors.reset} ${percent}% to ${state.travel_destination}`;
+        return `${colors.blue}[TRAVEL]${colors.reset} ${percent}%${state.travel_destination ? ` to ${state.travel_destination}` : ''}`;
       }
       return '';
     }
 
     case 'mining_yield': {
-      const yield_ = msg.data as { resource_id: string; quantity: number };
-      return `${colors.green}[MINED]${colors.reset} ${yield_.quantity}x ${yield_.resource_id}`;
+      const yield_ = data as { resource_id?: string; quantity?: number } | null;
+      const resourceId = yield_?.resource_id || 'unknown';
+      const quantity = yield_?.quantity ?? '?';
+      return `${colors.green}[MINED]${colors.reset} ${quantity}x ${resourceId}`;
     }
 
     case 'combat': {
-      const combat = msg.data as { type: string; damage?: number; target?: string; attacker?: string };
-      if (combat.type === 'hit') {
-        return `${colors.red}[COMBAT]${colors.reset} Hit for ${combat.damage} damage`;
+      const combat = data as { type?: string; damage?: number; target?: string; attacker?: string } | null;
+      if (combat?.type === 'hit') {
+        return `${colors.red}[COMBAT]${colors.reset} Hit${combat.damage !== undefined ? ` for ${combat.damage} damage` : ''}`;
       }
-      if (combat.type === 'miss') {
+      if (combat?.type === 'miss') {
         return `${colors.yellow}[COMBAT]${colors.reset} Attack missed`;
       }
-      if (combat.type === 'destroyed') {
+      if (combat?.type === 'destroyed') {
         return `${colors.red}${colors.bright}[DESTROYED]${colors.reset} Ship destroyed!`;
+      }
+      // Unknown combat type - show what we have
+      const message = extractMessage(combat as Record<string, unknown>);
+      if (message) {
+        return `${colors.red}[COMBAT]${colors.reset} ${message}`;
       }
       return `${colors.red}[COMBAT]${colors.reset} ${JSON.stringify(combat)}`;
     }
 
     case 'travel': {
-      const travel = msg.data as { type: string; poi?: string };
-      if (travel.type === 'arrived') {
-        return `${colors.green}[ARRIVED]${colors.reset} Now at ${travel.poi}`;
+      const travel = data as { type?: string; poi?: string } | null;
+      if (travel?.type === 'arrived') {
+        return `${colors.green}[ARRIVED]${colors.reset}${travel.poi ? ` Now at ${travel.poi}` : ''}`;
       }
       return '';
     }
 
-    default:
-      return `${colors.dim}[${timestamp}]${colors.reset} [${msg.type.toUpperCase()}] ${JSON.stringify(msg.data)}`;
+    default: {
+      // Forward-compatible default handler for unknown message types
+      const typeName = formatTypeName(msg.type);
+
+      // Try to extract a meaningful message from the payload
+      const message = extractMessage(data);
+      if (message) {
+        return `${colors.dim}[${timestamp}]${colors.reset} ${colors.magenta}[${typeName}]${colors.reset} ${message}`;
+      }
+
+      // If there's a 'data' field with content, try to display it nicely
+      if (data && data.data && typeof data.data !== 'object') {
+        return `${colors.dim}[${timestamp}]${colors.reset} ${colors.magenta}[${typeName}]${colors.reset} ${data.data}`;
+      }
+
+      // If the payload is very simple (few keys), format it nicely
+      if (data && Object.keys(data).length > 0 && Object.keys(data).length <= 3) {
+        const parts = Object.entries(data).map(([key, value]) => {
+          if (typeof value === 'object') {
+            return `${key}: ${JSON.stringify(value)}`;
+          }
+          return `${key}: ${value}`;
+        });
+        return `${colors.dim}[${timestamp}]${colors.reset} ${colors.magenta}[${typeName}]${colors.reset} ${parts.join(' | ')}`;
+      }
+
+      // Fall back to JSON for complex payloads
+      return `${colors.dim}[${timestamp}]${colors.reset} ${colors.magenta}[${typeName}]${colors.reset} ${JSON.stringify(data)}`;
+    }
   }
 }
 
@@ -480,8 +599,9 @@ ${colors.bright}Notes:${colors.reset}
   - Run 'client stop' to stop the daemon
 
 ${colors.bright}Environment Variables:${colors.reset}
-  SPACEMOLT_URL    WebSocket URL (default: wss://game.spacemolt.com/ws)
-  DEBUG            Enable debug logging (set to 'true')
+  SPACEMOLT_URL          WebSocket URL (default: wss://game.spacemolt.com/ws)
+  SPACEMOLT_CREDENTIALS  Path to credentials file (default: ~/.config/spacemolt/credentials.json)
+  DEBUG                  Enable debug logging (set to 'true')
 `);
 }
 

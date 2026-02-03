@@ -14,6 +14,8 @@ import type {
   ErrorPayload,
   StateUpdatePayload,
   ChatMessage,
+  CommandInfo,
+  CommandsPayload,
 } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -24,22 +26,36 @@ import type { Socket } from 'bun';
 const SERVER_URL = process.env.SPACEMOLT_URL || 'wss://game.spacemolt.com/ws';
 const DEBUG = process.env.DEBUG === 'true';
 
+// Get a unique user identifier that works cross-platform
+function getUserIdentifier(): string {
+  // On Unix-like systems, use getuid if available
+  if (typeof process.getuid === 'function') {
+    return String(process.getuid());
+  }
+  // On Windows, use USERNAME environment variable or os.userInfo().username
+  return process.env.USERNAME || os.userInfo().username || 'default';
+}
+
 // Get socket path in user's runtime directory
 function getSocketPath(): string {
   const runtimeDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
-  return path.join(runtimeDir, `spacemolt-${process.getuid()}.sock`);
+  return path.join(runtimeDir, `spacemolt-${getUserIdentifier()}.sock`);
 }
 
 // Get credentials file path
 function getCredentialsPath(): string {
+  // Allow environment variable override
+  if (process.env.SPACEMOLT_CREDENTIALS) {
+    return process.env.SPACEMOLT_CREDENTIALS;
+  }
   const homeDir = os.homedir();
-  return path.join(homeDir, '.spacemolt-credentials.json');
+  return path.join(homeDir, '.config', 'spacemolt', 'credentials.json');
 }
 
 // Get PID file path
 function getPidPath(): string {
   const runtimeDir = process.env.XDG_RUNTIME_DIR || os.tmpdir();
-  return path.join(runtimeDir, `spacemolt-${process.getuid()}.pid`);
+  return path.join(runtimeDir, `spacemolt-${getUserIdentifier()}.pid`);
 }
 
 export const SOCKET_PATH = getSocketPath();
@@ -77,6 +93,9 @@ let welcomeReceived = false;
 let lastWelcome: WelcomePayload | null = null;
 let connectedClients: Set<Socket<{ buffer: string }>> = new Set();
 
+// Cached command info from server (for dynamic help generation)
+let commandInfo: CommandInfo[] = [];
+
 // Load saved credentials
 async function loadCredentials(): Promise<void> {
   try {
@@ -93,6 +112,11 @@ async function loadCredentials(): Promise<void> {
 // Save credentials
 async function saveCredentials(username: string, token: string): Promise<void> {
   credentials = { username, token };
+  // Ensure parent directory exists
+  const parentDir = path.dirname(CREDENTIALS_PATH);
+  if (!fs.existsSync(parentDir)) {
+    fs.mkdirSync(parentDir, { recursive: true });
+  }
   await Bun.write(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2));
   if (DEBUG) console.log('[Daemon] Credentials saved');
 }
@@ -124,6 +148,9 @@ function setupClientHandlers(): void {
     welcomeReceived = true;
     lastWelcome = data;
     queueMessage('welcome', data);
+
+    // Request command list for dynamic help generation
+    client.getCommands();
 
     // Auto-login if we have credentials
     if (credentials) {
@@ -257,6 +284,12 @@ function setupClientHandlers(): void {
   // Trade offer received
   client.on('trade_offer_received', (data) => {
     queueMessage('system', { message: 'Trade offer received!', ...data });
+  });
+
+  // Command list for dynamic help
+  client.on<CommandsPayload>('commands', (data) => {
+    commandInfo = data.commands;
+    if (DEBUG) console.log(`[Daemon] Received ${commandInfo.length} command definitions from server`);
   });
 }
 
@@ -580,6 +613,172 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         return { id, success: true, messages, response: { action: 'craft', recipe_id: recipeId } };
       }
 
+      // Insurance
+      case 'buy_insurance': {
+        const [coverageStr] = args;
+        if (!coverageStr) {
+          return { id, success: false, messages, error: 'Usage: buy_insurance <coverage_percent>' };
+        }
+        const coveragePercent = parseInt(coverageStr);
+        client.buyInsurance(coveragePercent);
+        return { id, success: true, messages, response: { action: 'buy_insurance', coverage_percent: coveragePercent } };
+      }
+
+      case 'claim_insurance':
+        client.claimInsurance();
+        return { id, success: true, messages, response: { action: 'claim_insurance' } };
+
+      // Ship Modules
+      case 'install_mod': {
+        const [moduleId, slotIdxStr] = args;
+        if (!moduleId || !slotIdxStr) {
+          return { id, success: false, messages, error: 'Usage: install_mod <module_id> <slot_idx>' };
+        }
+        const slotIdx = parseInt(slotIdxStr);
+        client.installMod(moduleId, slotIdx);
+        return { id, success: true, messages, response: { action: 'install_mod', module_id: moduleId, slot_idx: slotIdx } };
+      }
+
+      case 'uninstall_mod': {
+        const [slotIdxStr] = args;
+        if (!slotIdxStr) {
+          return { id, success: false, messages, error: 'Usage: uninstall_mod <slot_idx>' };
+        }
+        const slotIdx = parseInt(slotIdxStr);
+        client.uninstallMod(slotIdx);
+        return { id, success: true, messages, response: { action: 'uninstall_mod', slot_idx: slotIdx } };
+      }
+
+      // Faction Management
+      case 'create_faction': {
+        const [name, tag] = args;
+        if (!name || !tag) {
+          return { id, success: false, messages, error: 'Usage: create_faction <name> <tag>' };
+        }
+        client.createFaction(name, tag);
+        return { id, success: true, messages, response: { action: 'create_faction', name, tag } };
+      }
+
+      case 'leave_faction':
+        client.leaveFaction();
+        return { id, success: true, messages, response: { action: 'leave_faction' } };
+
+      case 'faction_invite': {
+        const [playerId] = args;
+        if (!playerId) {
+          return { id, success: false, messages, error: 'Usage: faction_invite <player_id>' };
+        }
+        client.factionInvite(playerId);
+        return { id, success: true, messages, response: { action: 'faction_invite', player_id: playerId } };
+      }
+
+      case 'faction_kick': {
+        const [playerId] = args;
+        if (!playerId) {
+          return { id, success: false, messages, error: 'Usage: faction_kick <player_id>' };
+        }
+        client.factionKick(playerId);
+        return { id, success: true, messages, response: { action: 'faction_kick', player_id: playerId } };
+      }
+
+      case 'faction_promote': {
+        const [playerId, roleId] = args;
+        if (!playerId || !roleId) {
+          return { id, success: false, messages, error: 'Usage: faction_promote <player_id> <role_id>' };
+        }
+        client.factionPromote(playerId, roleId);
+        return { id, success: true, messages, response: { action: 'faction_promote', player_id: playerId, role_id: roleId } };
+      }
+
+      // Profile
+      case 'set_status': {
+        const [statusMessage, clanTag] = args;
+        if (!statusMessage) {
+          return { id, success: false, messages, error: 'Usage: set_status <status_message> [clan_tag]' };
+        }
+        client.setStatus(statusMessage, clanTag || '');
+        return { id, success: true, messages, response: { action: 'set_status', status_message: statusMessage, clan_tag: clanTag || '' } };
+      }
+
+      case 'set_colors': {
+        const [primary, secondary] = args;
+        if (!primary || !secondary) {
+          return { id, success: false, messages, error: 'Usage: set_colors <primary> <secondary>' };
+        }
+        client.setColors(primary, secondary);
+        return { id, success: true, messages, response: { action: 'set_colors', primary, secondary } };
+      }
+
+      case 'set_anonymous': {
+        const [boolStr] = args;
+        if (!boolStr) {
+          return { id, success: false, messages, error: 'Usage: set_anonymous <true|false>' };
+        }
+        const anonymous = boolStr.toLowerCase() === 'true';
+        client.setAnonymous(anonymous);
+        return { id, success: true, messages, response: { action: 'set_anonymous', anonymous } };
+      }
+
+      // P2P Trading
+      case 'trade_offer': {
+        const [targetId, offerCreditsStr, requestCreditsStr] = args;
+        if (!targetId || !offerCreditsStr || !requestCreditsStr) {
+          return { id, success: false, messages, error: 'Usage: trade_offer <target_id> <offer_credits> <request_credits>' };
+        }
+        const offerCredits = parseInt(offerCreditsStr);
+        const requestCredits = parseInt(requestCreditsStr);
+        client.tradeOffer(targetId, [], offerCredits, [], requestCredits);
+        return { id, success: true, messages, response: { action: 'trade_offer', target_id: targetId, offer_credits: offerCredits, request_credits: requestCredits } };
+      }
+
+      case 'trade_accept': {
+        const [tradeId] = args;
+        if (!tradeId) {
+          return { id, success: false, messages, error: 'Usage: trade_accept <trade_id>' };
+        }
+        client.tradeAccept(tradeId);
+        return { id, success: true, messages, response: { action: 'trade_accept', trade_id: tradeId } };
+      }
+
+      case 'trade_decline': {
+        const [tradeId] = args;
+        if (!tradeId) {
+          return { id, success: false, messages, error: 'Usage: trade_decline <trade_id>' };
+        }
+        client.tradeDecline(tradeId);
+        return { id, success: true, messages, response: { action: 'trade_decline', trade_id: tradeId } };
+      }
+
+      case 'trade_cancel': {
+        const [tradeId] = args;
+        if (!tradeId) {
+          return { id, success: false, messages, error: 'Usage: trade_cancel <trade_id>' };
+        }
+        client.tradeCancel(tradeId);
+        return { id, success: true, messages, response: { action: 'trade_cancel', trade_id: tradeId } };
+      }
+
+      // Player Market
+      case 'list_item': {
+        const [itemId, quantityStr, priceEachStr] = args;
+        if (!itemId || !quantityStr || !priceEachStr) {
+          return { id, success: false, messages, error: 'Usage: list_item <item_id> <quantity> <price_each>' };
+        }
+        const quantity = parseInt(quantityStr);
+        const priceEach = parseInt(priceEachStr);
+        client.listItem(itemId, quantity, priceEach);
+        return { id, success: true, messages, response: { action: 'list_item', item_id: itemId, quantity, price_each: priceEach } };
+      }
+
+      case 'cancel_list': {
+        const [listingId] = args;
+        if (!listingId) {
+          return { id, success: false, messages, error: 'Usage: cancel_list <listing_id>' };
+        }
+        client.cancelList(listingId);
+        return { id, success: true, messages, response: { action: 'cancel_list', listing_id: listingId } };
+      }
+
       case 'version':
       case 'get_version':
         client.getVersion();
@@ -603,7 +802,50 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
   }
 }
 
-function getHelpText(): string {
+// Generate dynamic help text from cached command info
+function generateDynamicHelpText(): string {
+  if (commandInfo.length === 0) {
+    return '';
+  }
+
+  // Group commands by category
+  const categories: Record<string, CommandInfo[]> = {};
+  for (const cmd of commandInfo) {
+    const category = cmd.category || 'other';
+    if (!categories[category]) {
+      categories[category] = [];
+    }
+    categories[category].push(cmd);
+  }
+
+  // Sort categories for consistent display
+  const sortedCategories = Object.keys(categories).sort();
+
+  let helpText = '';
+  for (const category of sortedCategories) {
+    const commands = categories[category];
+    // Capitalize category name
+    const categoryTitle = category.charAt(0).toUpperCase() + category.slice(1);
+    helpText += `\n=== ${categoryTitle} ===\n`;
+
+    for (const cmd of commands) {
+      // Format parameters: <required> [optional]
+      const params = cmd.parameters
+        .map(p => p.required ? `<${p.name}>` : `[${p.name}]`)
+        .join(' ');
+
+      const cmdWithParams = params ? `${cmd.name} ${params}` : cmd.name;
+      // Pad command to align descriptions
+      const padded = cmdWithParams.padEnd(30);
+      helpText += `  ${padded}${cmd.description}\n`;
+    }
+  }
+
+  return helpText;
+}
+
+// Fallback static help text when server doesn't provide commands
+function getFallbackHelpText(): string {
   return `
 SpaceMolt Client (Daemon Mode)
 ==============================
@@ -630,6 +872,14 @@ Combat:
   attack <player_id>            - Attack another player
   scan <player_id>              - Scan another player
 
+Ship Management:
+  buy_ship <ship_class>         - Buy a new ship
+  set_home_base                 - Set current base as home
+  install_mod <mod_id> <slot>   - Install module in slot
+  uninstall_mod <slot>          - Uninstall module from slot
+  buy_insurance <coverage%>     - Buy insurance coverage
+  claim_insurance               - Claim insurance payout
+
 Information:
   status                        - Show current status
   system                        - Show current system info
@@ -641,10 +891,22 @@ Information:
   recipes                       - Show crafting recipes
   version                       - Show game version
 
+Profile:
+  set_status <msg> [tag]        - Set status message and clan tag
+  set_colors <pri> <sec>        - Set primary and secondary colors
+  set_anonymous <true|false>    - Toggle anonymous mode
+
 Chat:
   say <message>                 - Send local chat
   faction <message>             - Send faction chat
   msg <player_id> <message>     - Send private message
+
+Faction Management:
+  create_faction <name> <tag>   - Create a new faction
+  leave_faction                 - Leave current faction
+  faction_invite <player_id>    - Invite player to faction
+  faction_kick <player_id>      - Kick player from faction
+  faction_promote <id> <role>   - Promote player to role
 
 Forum:
   forum [page] [category]       - List forum threads
@@ -653,17 +915,45 @@ Forum:
   forum_reply <thread_id> <msg> - Reply to a thread
   forum_upvote <id>             - Upvote a thread or reply
 
-Wrecks & Trading:
+Wrecks:
   wrecks                        - List wrecks at current POI
   loot <wreck_id> <item_id> <qty> - Loot from a wreck
   salvage <wreck_id>            - Salvage a wreck
+
+P2P Trading:
+  trade_offer <id> <offer> <req> - Offer credits trade to player
+  trade_accept <trade_id>       - Accept a trade offer
+  trade_decline <trade_id>      - Decline a trade offer
+  trade_cancel <trade_id>       - Cancel your trade offer
   trades                        - List pending trades
+
+Player Market:
+  list_item <item> <qty> <price> - List item for sale
+  cancel_list <listing_id>      - Cancel a listing
   listings                      - List market listings
 
 Daemon:
   stop                          - Stop the daemon
   help                          - Show this help
 `;
+}
+
+function getHelpText(): string {
+  // Try to use dynamic help from server
+  const dynamicHelp = generateDynamicHelpText();
+  if (dynamicHelp) {
+    return `
+SpaceMolt Client (Daemon Mode)
+==============================
+${dynamicHelp}
+=== Daemon ===
+  stop                          Stop the daemon
+  help                          Show this help
+`;
+  }
+
+  // Fall back to static help if server doesn't provide commands
+  return getFallbackHelpText();
 }
 
 // Cleanup and shutdown

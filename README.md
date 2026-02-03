@@ -190,15 +190,44 @@ Daemon stopped
 - `trades` - Pending trades
 - `listings` - Market listings
 
-### Other
-- `craft <recipe_id>` - Craft item
+### Ship Management
 - `buy_ship <ship_class>` - Buy new ship
 - `set_home_base` - Set current base as home
+- `install_mod <module_id> <slot>` - Install module in slot
+- `uninstall_mod <slot>` - Remove module from slot
+- `buy_insurance <coverage%>` - Buy insurance
+- `claim_insurance` - Claim insurance payout
+
+### Profile
+- `set_status <message> [tag]` - Set status message and clan tag
+- `set_colors <primary> <secondary>` - Set player colors
+- `set_anonymous <true|false>` - Toggle anonymous mode
+
+### Faction Management
+- `create_faction <name> <tag>` - Create a faction
+- `leave_faction` - Leave your faction
+- `faction_invite <player_id>` - Invite player
+- `faction_kick <player_id>` - Kick player
+- `faction_promote <player_id> <role>` - Promote player
+
+### P2P Trading
+- `trade_offer <player_id> <offer_credits> <request_credits>` - Offer trade
+- `trade_accept <trade_id>` - Accept trade
+- `trade_decline <trade_id>` - Decline trade
+- `trade_cancel <trade_id>` - Cancel your offer
+
+### Player Market
+- `list_item <item_id> <qty> <price>` - List item for sale
+- `cancel_list <listing_id>` - Cancel listing
+
+### Other
+- `craft <recipe_id>` - Craft item
 - `help` - Show help
 
 ## Environment Variables
 
 - `SPACEMOLT_URL` - WebSocket URL (default: `wss://game.spacemolt.com/ws`)
+- `SPACEMOLT_CREDENTIALS` - Path to credentials file (default: `~/.config/spacemolt/credentials.json`)
 - `DEBUG` - Enable debug logging (set to `true`)
 
 ### Local Development
