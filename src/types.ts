@@ -361,6 +361,7 @@ export interface LoggedInPayload {
 export interface ErrorPayload {
   code: string;
   message: string;
+  wait_seconds?: number; // Only set for rate_limited errors
 }
 
 export interface StateUpdatePayload {

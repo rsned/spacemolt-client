@@ -605,6 +605,36 @@ ${colors.bright}Environment Variables:${colors.reset}
 `);
 }
 
+// Check if response contains a rate_limited error and return wait time
+function getRateLimitWaitTime(response: IPCResponse): number | null {
+  for (const msg of response.messages) {
+    if (msg.type === 'error') {
+      const err = msg.data as { code?: string; wait_seconds?: number } | null;
+      if (err?.code === 'rate_limited' && typeof err.wait_seconds === 'number') {
+        return err.wait_seconds;
+      }
+    }
+  }
+  return null;
+}
+
+// Display queued messages except rate_limited errors (for retry scenarios)
+function displayNonRateLimitMessages(response: IPCResponse): void {
+  for (const msg of response.messages) {
+    // Skip rate_limited errors when we're going to retry
+    if (msg.type === 'error') {
+      const err = msg.data as { code?: string } | null;
+      if (err?.code === 'rate_limited') {
+        continue;
+      }
+    }
+    const formatted = formatMessage(msg);
+    if (formatted) {
+      console.log(formatted);
+    }
+  }
+}
+
 // Main CLI entry point
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -651,9 +681,37 @@ async function main(): Promise<void> {
     }
   }
 
-  // Send command to daemon
+  // Send command with auto-retry on rate limit
   const startTime = Date.now();
-  const response = await sendCommand(command, commandArgs);
+  const maxRetries = 3;
+  let retryCount = 0;
+  let response: IPCResponse | null = null;
+
+  while (retryCount <= maxRetries) {
+    response = await sendCommand(command, commandArgs);
+
+    if (!response) {
+      console.log(`${colors.dim}[${new Date().toISOString()}]${colors.reset}`);
+      process.exit(1);
+    }
+
+    // Check for rate_limited error with wait_seconds
+    const waitTime = getRateLimitWaitTime(response);
+    if (waitTime !== null && retryCount < maxRetries) {
+      // Display any non-rate-limit messages (like chat)
+      displayNonRateLimitMessages(response);
+
+      // Wait and retry
+      const waitMs = Math.ceil(waitTime * 1000) + 100; // Add 100ms buffer
+      console.log(`${colors.yellow}Waiting ${waitTime.toFixed(1)}s for next tick...${colors.reset}`);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      retryCount++;
+      continue;
+    }
+
+    // No rate limit or max retries reached - exit loop
+    break;
+  }
 
   if (!response) {
     console.log(`${colors.dim}[${new Date().toISOString()}]${colors.reset}`);
