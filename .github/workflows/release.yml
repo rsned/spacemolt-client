@@ -44,7 +44,7 @@ jobs:
         run: bun install
 
       - name: Build executable
-        run: bun build ./index.ts --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.artifact }}
+        run: bun build ./src/client.ts --compile --target=bun-${{ matrix.target }} --outfile=${{ matrix.artifact }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -59,7 +59,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history to find previous tags for release notes
+          fetch-depth: 0
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -83,37 +83,3 @@ jobs:
             artifacts/spacemolt-client-windows-x64.exe/spacemolt-client-windows-x64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Send Discord notification
-        run: |
-          # Get release notes from commits since last tag
-          # Use --abbrev=0 to get the closest tag, then exclude current tag
-          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
-          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -1)
-          if [ -n "$PREV_TAG" ]; then
-            NOTES=$(git log --pretty=format:"• %s" $PREV_TAG..$CURRENT_TAG 2>/dev/null | head -10)
-          fi
-          # Fallback if no notes found
-          if [ -z "$NOTES" ]; then
-            NOTES="• Bug fixes and improvements"
-          fi
-
-          # Build Discord webhook payload
-          PAYLOAD=$(jq -n \
-            --arg title "SpaceMolt Client v${{ steps.version.outputs.VERSION }} Released" \
-            --arg notes "$NOTES" \
-            --arg url "https://github.com/SpaceMolt/client/releases/tag/v${{ steps.version.outputs.VERSION }}" \
-            '{
-              "embeds": [{
-                "title": $title,
-                "description": ("New client release is now available!\n\n**Changes:**\n" + $notes),
-                "url": $url,
-                "color": 5814783,
-                "footer": { "text": "SpaceMolt DevTeam" }
-              }]
-            }')
-
-          # Send to Discord
-          curl -H "Content-Type: application/json" \
-            -d "$PAYLOAD" \
-            "${{ secrets.DISCORD_WEBHOOK_URL }}"
