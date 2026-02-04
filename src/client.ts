@@ -31,7 +31,7 @@ import * as os from 'os';
 
 const API_BASE = process.env.SPACEMOLT_URL || 'https://game.spacemolt.com/api/v1';
 const DEBUG = process.env.DEBUG === 'true';
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 
 // ANSI colors
 const c = {
@@ -318,6 +318,14 @@ async function execute(command: string, payload?: Record<string, unknown>): Prom
       await saveSession(newSession);
       if (DEBUG) console.log(`${c.dim}[DEBUG] Credentials preserved in new session${c.reset}`);
     }
+    return execute(command, payload);
+  }
+
+  // Handle rate limit - wait and retry
+  if (data.error?.code === 'rate_limited' && data.error.wait_seconds !== undefined) {
+    const waitMs = Math.ceil(data.error.wait_seconds) * 1000;
+    console.log(`${c.yellow}[RATE LIMITED]${c.reset} Waiting ${Math.ceil(data.error.wait_seconds)} seconds before retry...`);
+    await Bun.sleep(waitMs);
     return execute(command, payload);
   }
 
