@@ -31,7 +31,7 @@ import * as os from 'os';
 
 const API_BASE = process.env.SPACEMOLT_URL || 'https://game.spacemolt.com/api/v1';
 const DEBUG = process.env.DEBUG === 'true';
-const VERSION = '0.6.3';
+const VERSION = '0.6.5';
 
 // ANSI colors
 const c = {
@@ -465,6 +465,16 @@ const notificationHandlers: Record<string, NotificationHandler> = {
       // Generic system message
       console.log(`${c.dim}[${t}]${c.reset} ${c.magenta}[SYSTEM]${c.reset} ${d.message || JSON.stringify(d)}`);
     }
+  },
+
+  poi_arrival: (d, t) => {
+    const tag = d.clan_tag ? `[${d.clan_tag}] ` : '';
+    console.log(`${c.dim}[${t}]${c.reset} ${c.green}[ARRIVAL]${c.reset} ${tag}${d.username || 'Someone'} has arrived at ${d.poi_name || 'this POI'}`);
+  },
+
+  poi_departure: (d, t) => {
+    const tag = d.clan_tag ? `[${d.clan_tag}] ` : '';
+    console.log(`${c.dim}[${t}]${c.reset} ${c.yellow}[DEPARTURE]${c.reset} ${tag}${d.username || 'Someone'} has departed from ${d.poi_name || 'this POI'}`);
   },
 };
 
