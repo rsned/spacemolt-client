@@ -341,6 +341,37 @@ function formatMessage(msg: QueuedMessage): string {
       if (ok.action === 'arrived') {
         return `${colors.green}[OK]${colors.reset} Arrived${ok.poi ? ` at ${ok.poi}` : ''}`;
       }
+      // Cargo display
+      if (ok.action === 'get_cargo') {
+        const cargo = ok.cargo as Array<{ item_id?: string; name?: string; quantity?: number }> | undefined;
+        const used = ok.cargo_used ?? ok.used ?? '?';
+        const capacity = ok.cargo_capacity ?? ok.capacity ?? '?';
+        let output = `${colors.green}[CARGO]${colors.reset} ${used}/${capacity} used\n`;
+        if (cargo && cargo.length > 0) {
+          for (const item of cargo) {
+            const name = item.name || item.item_id || 'unknown';
+            const qty = item.quantity ?? '?';
+            output += `  ${qty}x ${name}\n`;
+          }
+        } else {
+          output += `  ${colors.dim}(empty)${colors.reset}\n`;
+        }
+        return output.trim();
+      }
+      // Nearby players display
+      if (ok.action === 'get_nearby') {
+        const nearby = ok.players as Array<{ username?: string; player_id?: string; ship_class?: string; anonymous?: boolean }> | undefined;
+        if (!nearby || nearby.length === 0) {
+          return `${colors.green}[NEARBY]${colors.reset} No other players here`;
+        }
+        let output = `${colors.green}[NEARBY]${colors.reset} ${nearby.length} player(s)\n`;
+        for (const p of nearby) {
+          const name = p.anonymous ? `${colors.dim}Anonymous${colors.reset}` : (p.username || p.player_id || 'Unknown');
+          const ship = p.ship_class ? ` (${p.ship_class})` : '';
+          output += `  ${name}${ship}\n`;
+        }
+        return output.trim();
+      }
       if (ok.action) {
         return `${colors.green}[OK]${colors.reset} ${ok.action}`;
       }

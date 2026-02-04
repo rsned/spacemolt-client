@@ -280,6 +280,9 @@ export type MessageType =
   | 'get_recipes'
   | 'get_version'
   | 'version_info'
+  | 'get_cargo'
+  | 'get_nearby'
+  | 'help'
   // Player-to-player trading
   | 'trade_offer'
   | 'trade_accept'

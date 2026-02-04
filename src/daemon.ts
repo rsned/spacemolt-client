@@ -383,6 +383,21 @@ function setupClientHandlers(): void {
     queueMessage('ok', { action: 'get_ship', ...(data as Record<string, unknown>) });
   });
 
+  // Cargo info response
+  client.on('cargo_info', (data) => {
+    queueMessage('ok', { action: 'get_cargo', ...(data as Record<string, unknown>) });
+  });
+
+  // Nearby players response
+  client.on('nearby_info', (data) => {
+    queueMessage('ok', { action: 'get_nearby', ...(data as Record<string, unknown>) });
+  });
+
+  // Help response
+  client.on('help_info', (data) => {
+    queueMessage('ok', { action: 'help', ...(data as Record<string, unknown>) });
+  });
+
   // Cloak events
   client.on('cloaked', (data) => {
     queueMessage('ok', { action: 'cloak', enabled: true, ...(data as Record<string, unknown>) });
@@ -462,6 +477,16 @@ async function waitForAuthResponse(successEvent: 'logged_in' | 'registered'): Pr
   }
 
   return { promise };
+}
+
+// Helper to parse an integer argument with validation
+// Returns { value, error } where error is null on success
+function parseIntArg(str: string, fieldName: string): { value: number; error: string | null } {
+  const value = parseInt(str, 10);
+  if (isNaN(value)) {
+    return { value: 0, error: `Invalid ${fieldName}: "${str}" is not a valid number` };
+  }
+  return { value, error: null };
 }
 
 // Process a command from the CLI
@@ -657,8 +682,12 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!listingId || !quantityStr) {
           return { id, success: false, messages, error: 'Usage: buy <listing_id> <quantity>' };
         }
-        client.buy(listingId, parseInt(quantityStr));
-        return { id, success: true, messages, response: { action: 'buy', listing_id: listingId, quantity: parseInt(quantityStr) } };
+        const quantity = parseIntArg(quantityStr, 'quantity');
+        if (quantity.error) {
+          return { id, success: false, messages, error: quantity.error };
+        }
+        client.buy(listingId, quantity.value);
+        return { id, success: true, messages, response: { action: 'buy', listing_id: listingId, quantity: quantity.value } };
       }
 
       case 'sell': {
@@ -666,8 +695,12 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!itemId || !quantityStr) {
           return { id, success: false, messages, error: 'Usage: sell <item_id> <quantity>' };
         }
-        client.sell(itemId, parseInt(quantityStr));
-        return { id, success: true, messages, response: { action: 'sell', item_id: itemId, quantity: parseInt(quantityStr) } };
+        const quantity = parseIntArg(quantityStr, 'quantity');
+        if (quantity.error) {
+          return { id, success: false, messages, error: quantity.error };
+        }
+        client.sell(itemId, quantity.value);
+        return { id, success: true, messages, response: { action: 'sell', item_id: itemId, quantity: quantity.value } };
       }
 
       case 'refuel':
@@ -719,6 +752,10 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
           }
         };
 
+      case 'get_nearby':
+        client.getNearby();
+        return { id, success: true, messages, response: { action: 'get_nearby' } };
+
       case 'cargo':
         return {
           id,
@@ -729,6 +766,16 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
             ship: client.state.ship
           }
         };
+
+      case 'get_cargo':
+        client.getCargo();
+        return { id, success: true, messages, response: { action: 'get_cargo' } };
+
+      case 'server_help': {
+        const topic = args[0];
+        client.getHelp(topic);
+        return { id, success: true, messages, response: { action: 'help', topic } };
+      }
 
       case 'say': {
         const message = args.join(' ');
@@ -761,7 +808,14 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
       // Forum commands
       case 'forum':
       case 'forum_list': {
-        const page = args[0] ? parseInt(args[0], 10) : 0;
+        let page = 0;
+        if (args[0]) {
+          const parsed = parseIntArg(args[0], 'page');
+          if (parsed.error) {
+            return { id, success: false, messages, error: parsed.error };
+          }
+          page = parsed.value;
+        }
         const category = args[1] || 'general';
         client.forumList(page, category);
         return { id, success: true, messages, response: { action: 'forum_list', page, category } };
@@ -827,7 +881,11 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!wreckId || !itemId || !quantityStr) {
           return { id, success: false, messages, error: 'Usage: loot <wreck_id> <item_id> <quantity>' };
         }
-        client.lootWreck(wreckId, itemId, parseInt(quantityStr));
+        const quantity = parseIntArg(quantityStr, 'quantity');
+        if (quantity.error) {
+          return { id, success: false, messages, error: quantity.error };
+        }
+        client.lootWreck(wreckId, itemId, quantity.value);
         return { id, success: true, messages, response: { action: 'loot_wreck', wreck_id: wreckId } };
       }
 
@@ -891,9 +949,12 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!coverageStr) {
           return { id, success: false, messages, error: 'Usage: buy_insurance <coverage_percent>' };
         }
-        const coveragePercent = parseInt(coverageStr);
-        client.buyInsurance(coveragePercent);
-        return { id, success: true, messages, response: { action: 'buy_insurance', coverage_percent: coveragePercent } };
+        const coverage = parseIntArg(coverageStr, 'coverage_percent');
+        if (coverage.error) {
+          return { id, success: false, messages, error: coverage.error };
+        }
+        client.buyInsurance(coverage.value);
+        return { id, success: true, messages, response: { action: 'buy_insurance', coverage_percent: coverage.value } };
       }
 
       case 'claim_insurance':
@@ -906,9 +967,12 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!moduleId || !slotIdxStr) {
           return { id, success: false, messages, error: 'Usage: install_mod <module_id> <slot_idx>' };
         }
-        const slotIdx = parseInt(slotIdxStr);
-        client.installMod(moduleId, slotIdx);
-        return { id, success: true, messages, response: { action: 'install_mod', module_id: moduleId, slot_idx: slotIdx } };
+        const slotIdx = parseIntArg(slotIdxStr, 'slot_idx');
+        if (slotIdx.error) {
+          return { id, success: false, messages, error: slotIdx.error };
+        }
+        client.installMod(moduleId, slotIdx.value);
+        return { id, success: true, messages, response: { action: 'install_mod', module_id: moduleId, slot_idx: slotIdx.value } };
       }
 
       case 'uninstall_mod': {
@@ -916,9 +980,12 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!slotIdxStr) {
           return { id, success: false, messages, error: 'Usage: uninstall_mod <slot_idx>' };
         }
-        const slotIdx = parseInt(slotIdxStr);
-        client.uninstallMod(slotIdx);
-        return { id, success: true, messages, response: { action: 'uninstall_mod', slot_idx: slotIdx } };
+        const slotIdx = parseIntArg(slotIdxStr, 'slot_idx');
+        if (slotIdx.error) {
+          return { id, success: false, messages, error: slotIdx.error };
+        }
+        client.uninstallMod(slotIdx.value);
+        return { id, success: true, messages, response: { action: 'uninstall_mod', slot_idx: slotIdx.value } };
       }
 
       // Faction Management
@@ -997,10 +1064,16 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!targetId || !offerCreditsStr || !requestCreditsStr) {
           return { id, success: false, messages, error: 'Usage: trade_offer <target_id> <offer_credits> <request_credits>' };
         }
-        const offerCredits = parseInt(offerCreditsStr);
-        const requestCredits = parseInt(requestCreditsStr);
-        client.tradeOffer(targetId, [], offerCredits, [], requestCredits);
-        return { id, success: true, messages, response: { action: 'trade_offer', target_id: targetId, offer_credits: offerCredits, request_credits: requestCredits } };
+        const offerCredits = parseIntArg(offerCreditsStr, 'offer_credits');
+        if (offerCredits.error) {
+          return { id, success: false, messages, error: offerCredits.error };
+        }
+        const requestCredits = parseIntArg(requestCreditsStr, 'request_credits');
+        if (requestCredits.error) {
+          return { id, success: false, messages, error: requestCredits.error };
+        }
+        client.tradeOffer(targetId, [], offerCredits.value, [], requestCredits.value);
+        return { id, success: true, messages, response: { action: 'trade_offer', target_id: targetId, offer_credits: offerCredits.value, request_credits: requestCredits.value } };
       }
 
       case 'trade_accept': {
@@ -1036,10 +1109,16 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!itemId || !quantityStr || !priceEachStr) {
           return { id, success: false, messages, error: 'Usage: list_item <item_id> <quantity> <price_each>' };
         }
-        const quantity = parseInt(quantityStr);
-        const priceEach = parseInt(priceEachStr);
-        client.listItem(itemId, quantity, priceEach);
-        return { id, success: true, messages, response: { action: 'list_item', item_id: itemId, quantity, price_each: priceEach } };
+        const quantity = parseIntArg(quantityStr, 'quantity');
+        if (quantity.error) {
+          return { id, success: false, messages, error: quantity.error };
+        }
+        const priceEach = parseIntArg(priceEachStr, 'price_each');
+        if (priceEach.error) {
+          return { id, success: false, messages, error: priceEach.error };
+        }
+        client.listItem(itemId, quantity.value, priceEach.value);
+        return { id, success: true, messages, response: { action: 'list_item', item_id: itemId, quantity: quantity.value, price_each: priceEach.value } };
       }
 
       case 'cancel_list': {
@@ -1082,8 +1161,22 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
       case 'factions': {
         const limitStr = args[0];
         const offsetStr = args[1];
-        const limit = limitStr ? parseInt(limitStr) : undefined;
-        const offset = offsetStr ? parseInt(offsetStr) : undefined;
+        let limit: number | undefined = undefined;
+        let offset: number | undefined = undefined;
+        if (limitStr) {
+          const parsed = parseIntArg(limitStr, 'limit');
+          if (parsed.error) {
+            return { id, success: false, messages, error: parsed.error };
+          }
+          limit = parsed.value;
+        }
+        if (offsetStr) {
+          const parsed = parseIntArg(offsetStr, 'offset');
+          if (parsed.error) {
+            return { id, success: false, messages, error: parsed.error };
+          }
+          offset = parsed.value;
+        }
         client.factionList(limit, offset);
         return { id, success: true, messages, response: { action: 'faction_list', limit, offset } };
       }
@@ -1270,7 +1363,14 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!wreckId) {
           return { id, success: false, messages, error: 'Usage: loot_base_wreck <wreck_id> [item_id] [quantity]' };
         }
-        const quantity = quantityStr ? parseInt(quantityStr) : undefined;
+        let quantity: number | undefined = undefined;
+        if (quantityStr) {
+          const parsed = parseIntArg(quantityStr, 'quantity');
+          if (parsed.error) {
+            return { id, success: false, messages, error: parsed.error };
+          }
+          quantity = parsed.value;
+        }
         client.lootBaseWreck(wreckId, itemId, quantity);
         return { id, success: true, messages, response: { action: 'loot_base_wreck', wreck_id: wreckId } };
       }
@@ -1344,9 +1444,12 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         if (!indexStr) {
           return { id, success: false, messages, error: 'Usage: captains_log_get <index>' };
         }
-        const index = parseInt(indexStr);
-        client.captainsLogGet(index);
-        return { id, success: true, messages, response: { action: 'captains_log_get', index } };
+        const index = parseIntArg(indexStr, 'index');
+        if (index.error) {
+          return { id, success: false, messages, error: index.error };
+        }
+        client.captainsLogGet(index.value);
+        return { id, success: true, messages, response: { action: 'captains_log_get', index: index.value } };
       }
 
       // Ship info
@@ -1633,15 +1736,40 @@ async function handleClientData(socket: Socket<{ buffer: string }>, data: Buffer
         if (DEBUG) console.log('[Daemon] Received command:', request.command, request.args);
 
         const response = await processCommand(request);
-        socket.write(JSON.stringify(response) + '\n');
+        const data = JSON.stringify(response) + '\n';
+
+        // Handle large writes by writing in chunks
+        let offset = 0;
+        while (offset < data.length) {
+          const chunk = data.slice(offset);
+          const bytesWritten = socket.write(chunk);
+          if (bytesWritten === 0) {
+            // Buffer full, wait for drain
+            await new Promise<void>(resolve => {
+              const checkDrain = () => {
+                const written = socket.write('');
+                if (written >= 0) {
+                  resolve();
+                } else {
+                  setTimeout(checkDrain, 10);
+                }
+              };
+              setTimeout(checkDrain, 10);
+            });
+          } else {
+            offset += bytesWritten;
+          }
+        }
+        if (DEBUG) console.log('[Daemon] Wrote', data.length, 'bytes');
       } catch (parseError) {
         console.error('[Daemon] Error parsing message:', parseError);
-        socket.write(JSON.stringify({
+        const errorData = JSON.stringify({
           id: 'error',
           success: false,
           messages: [],
           error: 'Invalid JSON',
-        }) + '\n');
+        }) + '\n';
+        socket.write(errorData);
       }
     }
 

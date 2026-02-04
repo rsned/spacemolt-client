@@ -602,6 +602,18 @@ export class SpaceMoltClient {
     this.send('get_commands');
   }
 
+  getCargo(): void {
+    this.send('get_cargo');
+  }
+
+  getNearby(): void {
+    this.send('get_nearby');
+  }
+
+  getHelp(topic?: string): void {
+    this.send('help', topic ? { topic } : {});
+  }
+
   // Forum
 
   forumList(page: number = 0, category: string = 'general'): void {
