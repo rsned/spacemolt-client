@@ -31,7 +31,7 @@ import * as os from 'os';
 
 const API_BASE = process.env.SPACEMOLT_URL || 'https://game.spacemolt.com/api/v1';
 const DEBUG = process.env.DEBUG === 'true';
-const VERSION = '0.6.1';
+const VERSION = '0.6.2';
 
 // ANSI colors
 const c = {
@@ -793,6 +793,39 @@ function getUsageHint(command: string): string {
   return COMMANDS[command]?.usage || '<args...>';
 }
 
+// Fields that should be converted to numbers when sending to the server
+const NUMERIC_FIELDS = new Set([
+  'quantity', 'price_each', 'slot_idx', 'weapon_idx', 'page', 'limit', 'offset',
+  'coverage_percent', 'offer_credits', 'request_credits', 'index',
+]);
+
+// Convert string payload values to appropriate types (numbers, booleans)
+function convertPayloadTypes(payload: Record<string, string>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    // Convert numeric fields
+    if (NUMERIC_FIELDS.has(key)) {
+      const num = parseFloat(value);
+      if (!isNaN(num)) {
+        result[key] = num;
+        continue;
+      }
+    }
+    // Convert boolean fields
+    if (value === 'true') {
+      result[key] = true;
+      continue;
+    }
+    if (value === 'false') {
+      result[key] = false;
+      continue;
+    }
+    // Keep as string
+    result[key] = value;
+  }
+  return result;
+}
+
 // =============================================================================
 // Help
 // =============================================================================
@@ -952,7 +985,9 @@ async function main(): Promise<void> {
       await saveSession(session);
     }
 
-    const response = await execute(command, Object.keys(payload).length > 0 ? payload : undefined);
+    // Convert string payload to proper types (numbers, booleans)
+    const typedPayload = Object.keys(payload).length > 0 ? convertPayloadTypes(payload) : undefined;
+    const response = await execute(command, typedPayload);
 
     if (response.notifications?.length) {
       console.log(`${c.dim}--- Notifications (${response.notifications.length}) ---${c.reset}`);
