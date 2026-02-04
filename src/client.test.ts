@@ -891,21 +891,13 @@ describe('SpaceMoltClient', () => {
     test('forumUpvote reply sends correct message', () => {
       const { client, messages } = createMockClient();
 
-      client.forumUpvote(undefined, 'reply-123');
+      client.forumUpvote('reply-123', 'reply');
 
       expect(messages).toHaveLength(1);
       expect(messages[0]).toEqual({
         type: 'forum_upvote',
         payload: { reply_id: 'reply-123' },
       });
-    });
-
-    test('forumUpvote with neither thread nor reply sends nothing', () => {
-      const { client, messages } = createMockClient();
-
-      client.forumUpvote();
-
-      expect(messages).toHaveLength(0);
     });
 
     test('forumDeleteThread sends correct message', () => {
@@ -929,6 +921,168 @@ describe('SpaceMoltClient', () => {
       expect(messages[0]).toEqual({
         type: 'forum_delete_reply',
         payload: { reply_id: 'reply-to-delete' },
+      });
+    });
+  });
+
+  describe('Cargo Management', () => {
+    test('jettison sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.jettison('iron_ore', 50);
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'jettison',
+        payload: { item_id: 'iron_ore', quantity: 50 },
+      });
+    });
+  });
+
+  describe('Missions', () => {
+    test('getMissions sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.getMissions();
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'get_missions',
+        payload: undefined,
+      });
+    });
+
+    test('acceptMission sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.acceptMission('mission-123');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'accept_mission',
+        payload: { mission_id: 'mission-123' },
+      });
+    });
+
+    test('completeMission sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.completeMission('mission-123');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'complete_mission',
+        payload: { mission_id: 'mission-123' },
+      });
+    });
+
+    test('getActiveMissions sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.getActiveMissions();
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'get_active_missions',
+        payload: undefined,
+      });
+    });
+
+    test('abandonMission sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.abandonMission('mission-123');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'abandon_mission',
+        payload: { mission_id: 'mission-123' },
+      });
+    });
+  });
+
+  describe('Friends', () => {
+    test('addFriend by player_id sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.addFriend('12345678-1234-1234-1234-123456789012');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'add_friend',
+        payload: { player_id: '12345678-1234-1234-1234-123456789012', message: undefined },
+      });
+    });
+
+    test('addFriend by username sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.addFriend('coolplayer', 'Hey, lets be friends!');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'add_friend',
+        payload: { username: 'coolplayer', message: 'Hey, lets be friends!' },
+      });
+    });
+
+    test('removeFriend sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.removeFriend('player-456');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'remove_friend',
+        payload: { player_id: 'player-456' },
+      });
+    });
+
+    test('getFriends sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.getFriends();
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'get_friends',
+        payload: undefined,
+      });
+    });
+
+    test('getFriendRequests sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.getFriendRequests();
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'get_friend_requests',
+        payload: undefined,
+      });
+    });
+
+    test('acceptFriendRequest sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.acceptFriendRequest('player-789');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'accept_friend_request',
+        payload: { player_id: 'player-789' },
+      });
+    });
+
+    test('declineFriendRequest sends correct message', () => {
+      const { client, messages } = createMockClient();
+
+      client.declineFriendRequest('player-789');
+
+      expect(messages).toHaveLength(1);
+      expect(messages[0]).toEqual({
+        type: 'decline_friend_request',
+        payload: { player_id: 'player-789' },
       });
     });
   });

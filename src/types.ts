@@ -357,7 +357,22 @@ export type MessageType =
   // Captain's log
   | 'captains_log_add'
   | 'captains_log_list'
-  | 'captains_log_get';
+  | 'captains_log_get'
+  // Cargo management
+  | 'jettison'
+  // Missions
+  | 'get_missions'
+  | 'accept_mission'
+  | 'complete_mission'
+  | 'get_active_missions'
+  | 'abandon_mission'
+  // Friends
+  | 'add_friend'
+  | 'remove_friend'
+  | 'get_friends'
+  | 'get_friend_requests'
+  | 'accept_friend_request'
+  | 'decline_friend_request';
 
 export interface Message<T = unknown> {
   type: MessageType;
@@ -834,4 +849,92 @@ export interface CaptainsLogEntry {
   created_at: string;
   system?: string;
   poi?: string;
+}
+
+// Jettison (Cargo Management)
+export interface JettisonPayload {
+  item_id: string;
+  quantity: number;
+}
+
+// Missions
+export interface Mission {
+  id: string;
+  title: string;
+  description: string;
+  type: MissionType;
+  reward_credits: number;
+  reward_items?: CargoItem[];
+  reward_xp?: Record<string, number>;
+  requirements?: MissionRequirements;
+  expires_at?: string;
+  target_system?: string;
+  target_poi?: string;
+}
+
+export type MissionType = 'delivery' | 'mining' | 'combat' | 'exploration' | 'courier' | 'bounty';
+
+export interface MissionRequirements {
+  items?: CargoItem[];
+  kills?: number;
+  target_player?: string;
+  destination_poi?: string;
+  destination_system?: string;
+}
+
+export interface ActiveMission extends Mission {
+  accepted_at: string;
+  progress?: MissionProgress;
+}
+
+export interface MissionProgress {
+  items_delivered?: number;
+  items_required?: number;
+  kills_completed?: number;
+  kills_required?: number;
+  current_poi?: string;
+  target_poi?: string;
+}
+
+export interface AcceptMissionPayload {
+  mission_id: string;
+}
+
+export interface CompleteMissionPayload {
+  mission_id: string;
+}
+
+export interface AbandonMissionPayload {
+  mission_id: string;
+}
+
+// Friends
+export interface Friend {
+  player_id: string;
+  username: string;
+  added_at: string;
+  online?: boolean;
+  status_message?: string;
+  current_system?: string;
+}
+
+export interface FriendRequest {
+  from_player_id: string;
+  from_username: string;
+  sent_at: string;
+  message?: string;
+}
+
+export interface AddFriendPayload {
+  player_id?: string;
+  username?: string;
+  message?: string;
+}
+
+export interface RemoveFriendPayload {
+  player_id: string;
+}
+
+export interface FriendRequestActionPayload {
+  player_id: string;
 }

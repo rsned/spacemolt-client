@@ -429,6 +429,65 @@ function setupClientHandlers(): void {
   client.on('skill_level_up', (data) => {
     queueMessage('system', { message: 'Skill level up!', ...(data as Record<string, unknown>) });
   });
+
+  // Mission responses
+  client.on('missions', (data) => {
+    queueMessage('ok', { action: 'get_missions', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('active_missions', (data) => {
+    queueMessage('ok', { action: 'get_active_missions', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('mission_accepted', (data) => {
+    queueMessage('ok', { action: 'accept_mission', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('mission_completed', (data) => {
+    queueMessage('system', { message: 'Mission completed!', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('mission_abandoned', (data) => {
+    queueMessage('ok', { action: 'abandon_mission', ...(data as Record<string, unknown>) });
+  });
+
+  // Friend responses
+  client.on('friends', (data) => {
+    queueMessage('ok', { action: 'get_friends', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('friend_requests', (data) => {
+    queueMessage('ok', { action: 'get_friend_requests', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('friend_request_sent', (data) => {
+    queueMessage('ok', { action: 'add_friend', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('friend_request_received', (data) => {
+    queueMessage('system', { message: 'Friend request received!', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('friend_added', (data) => {
+    queueMessage('system', { message: 'Friend added!', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('friend_removed', (data) => {
+    queueMessage('ok', { action: 'remove_friend', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('friend_online', (data) => {
+    queueMessage('system', { message: 'Friend online!', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('friend_offline', (data) => {
+    queueMessage('system', { message: 'Friend offline', ...(data as Record<string, unknown>) });
+  });
+
+  // Jettison response
+  client.on('jettisoned', (data) => {
+    queueMessage('ok', { action: 'jettison', ...(data as Record<string, unknown>) });
+  });
 }
 
 // Helper to wait for authentication response (logged_in, registered, or error)
@@ -862,12 +921,13 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
       }
 
       case 'forum_upvote': {
-        const [targetId] = args;
+        const [targetId, targetType] = args;
         if (!targetId) {
-          return { id, success: false, messages, error: 'Usage: forum_upvote <thread_id or reply_id>' };
+          return { id, success: false, messages, error: 'Usage: forum_upvote <id> [thread|reply]\n  Defaults to thread if not specified' };
         }
-        client.forumUpvote(targetId);
-        return { id, success: true, messages, response: { action: 'forum_upvote', id: targetId } };
+        const type: 'thread' | 'reply' = targetType === 'reply' ? 'reply' : 'thread';
+        client.forumUpvote(targetId, type);
+        return { id, success: true, messages, response: { action: 'forum_upvote', id: targetId, type } };
       }
 
       // Wrecks
@@ -1452,6 +1512,108 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         return { id, success: true, messages, response: { action: 'captains_log_get', index: index.value } };
       }
 
+      // Cargo Management
+      case 'jettison': {
+        const [itemId, quantityStr] = args;
+        if (!itemId || !quantityStr) {
+          return { id, success: false, messages, error: 'Usage: jettison <item_id> <quantity>' };
+        }
+        const quantity = parseIntArg(quantityStr, 'quantity');
+        if (quantity.error) {
+          return { id, success: false, messages, error: quantity.error };
+        }
+        client.jettison(itemId, quantity.value);
+        return { id, success: true, messages, response: { action: 'jettison', item_id: itemId, quantity: quantity.value } };
+      }
+
+      // Missions
+      case 'missions':
+      case 'get_missions':
+        client.getMissions();
+        return { id, success: true, messages, response: { action: 'get_missions' } };
+
+      case 'accept_mission': {
+        const [missionId] = args;
+        if (!missionId) {
+          return { id, success: false, messages, error: 'Usage: accept_mission <mission_id>' };
+        }
+        client.acceptMission(missionId);
+        return { id, success: true, messages, response: { action: 'accept_mission', mission_id: missionId } };
+      }
+
+      case 'complete_mission': {
+        const [missionId] = args;
+        if (!missionId) {
+          return { id, success: false, messages, error: 'Usage: complete_mission <mission_id>' };
+        }
+        client.completeMission(missionId);
+        return { id, success: true, messages, response: { action: 'complete_mission', mission_id: missionId } };
+      }
+
+      case 'active_missions':
+      case 'get_active_missions':
+        client.getActiveMissions();
+        return { id, success: true, messages, response: { action: 'get_active_missions' } };
+
+      case 'abandon_mission': {
+        const [missionId] = args;
+        if (!missionId) {
+          return { id, success: false, messages, error: 'Usage: abandon_mission <mission_id>' };
+        }
+        client.abandonMission(missionId);
+        return { id, success: true, messages, response: { action: 'abandon_mission', mission_id: missionId } };
+      }
+
+      // Friends
+      case 'add_friend': {
+        const [playerIdOrUsername, ...messageParts] = args;
+        if (!playerIdOrUsername) {
+          return { id, success: false, messages, error: 'Usage: add_friend <player_id_or_username> [message]' };
+        }
+        const message = messageParts.length > 0 ? messageParts.join(' ') : undefined;
+        client.addFriend(playerIdOrUsername, message);
+        return { id, success: true, messages, response: { action: 'add_friend', target: playerIdOrUsername } };
+      }
+
+      case 'remove_friend': {
+        const [playerId] = args;
+        if (!playerId) {
+          return { id, success: false, messages, error: 'Usage: remove_friend <player_id>' };
+        }
+        client.removeFriend(playerId);
+        return { id, success: true, messages, response: { action: 'remove_friend', player_id: playerId } };
+      }
+
+      case 'friends':
+      case 'get_friends':
+        client.getFriends();
+        return { id, success: true, messages, response: { action: 'get_friends' } };
+
+      case 'friend_requests':
+      case 'get_friend_requests':
+        client.getFriendRequests();
+        return { id, success: true, messages, response: { action: 'get_friend_requests' } };
+
+      case 'accept_friend_request':
+      case 'accept_friend': {
+        const [playerId] = args;
+        if (!playerId) {
+          return { id, success: false, messages, error: 'Usage: accept_friend_request <player_id>' };
+        }
+        client.acceptFriendRequest(playerId);
+        return { id, success: true, messages, response: { action: 'accept_friend_request', player_id: playerId } };
+      }
+
+      case 'decline_friend_request':
+      case 'decline_friend': {
+        const [playerId] = args;
+        if (!playerId) {
+          return { id, success: false, messages, error: 'Usage: decline_friend_request <player_id>' };
+        }
+        client.declineFriendRequest(playerId);
+        return { id, success: true, messages, response: { action: 'decline_friend_request', player_id: playerId } };
+      }
+
       // Ship info
       case 'ship':
       case 'get_ship':
@@ -1651,6 +1813,24 @@ Captain's Log:
   log_add <entry>               - Add entry to captain's log
   log_list                      - List all log entries
   log_get <index>               - Get specific log entry
+
+Cargo Management:
+  jettison <item_id> <quantity> - Jettison items from cargo
+
+Missions:
+  missions                      - List available missions at current base
+  accept_mission <mission_id>   - Accept a mission
+  complete_mission <mission_id> - Complete a mission
+  active_missions               - List your active missions
+  abandon_mission <mission_id>  - Abandon a mission
+
+Friends:
+  add_friend <id|username> [msg] - Send friend request
+  remove_friend <player_id>     - Remove a friend
+  friends                       - List your friends
+  friend_requests               - List pending friend requests
+  accept_friend <player_id>     - Accept friend request
+  decline_friend <player_id>    - Decline friend request
 
 Daemon:
   stop                          - Stop the daemon

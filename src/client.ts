@@ -70,6 +70,14 @@ import type {
   OrderDronePayload,
   CaptainsLogAddPayload,
   CaptainsLogGetPayload,
+  // New types
+  JettisonPayload,
+  AcceptMissionPayload,
+  CompleteMissionPayload,
+  AbandonMissionPayload,
+  AddFriendPayload,
+  RemoveFriendPayload,
+  FriendRequestActionPayload,
 } from './types';
 
 export type EventHandler<T> = (data: T) => void;
@@ -632,11 +640,11 @@ export class SpaceMoltClient {
     this.send('forum_reply', { thread_id: threadId, content });
   }
 
-  forumUpvote(threadId?: string, replyId?: string): void {
-    if (threadId) {
-      this.send('forum_upvote', { thread_id: threadId });
-    } else if (replyId) {
-      this.send('forum_upvote', { reply_id: replyId });
+  forumUpvote(targetId: string, targetType: 'thread' | 'reply' = 'thread'): void {
+    if (targetType === 'reply') {
+      this.send('forum_upvote', { reply_id: targetId });
+    } else {
+      this.send('forum_upvote', { thread_id: targetId });
     }
   }
 
@@ -790,6 +798,66 @@ export class SpaceMoltClient {
 
   captainsLogGet(index: number): void {
     this.send<CaptainsLogGetPayload>('captains_log_get', { index });
+  }
+
+  // Cargo Management
+
+  jettison(itemId: string, quantity: number): void {
+    this.send<JettisonPayload>('jettison', { item_id: itemId, quantity });
+  }
+
+  // Missions
+
+  getMissions(): void {
+    this.send('get_missions');
+  }
+
+  acceptMission(missionId: string): void {
+    this.send<AcceptMissionPayload>('accept_mission', { mission_id: missionId });
+  }
+
+  completeMission(missionId: string): void {
+    this.send<CompleteMissionPayload>('complete_mission', { mission_id: missionId });
+  }
+
+  getActiveMissions(): void {
+    this.send('get_active_missions');
+  }
+
+  abandonMission(missionId: string): void {
+    this.send<AbandonMissionPayload>('abandon_mission', { mission_id: missionId });
+  }
+
+  // Friends
+
+  addFriend(playerIdOrUsername: string, message?: string): void {
+    // Detect if it's a UUID or username
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(playerIdOrUsername);
+    if (isUUID) {
+      this.send<AddFriendPayload>('add_friend', { player_id: playerIdOrUsername, message });
+    } else {
+      this.send<AddFriendPayload>('add_friend', { username: playerIdOrUsername, message });
+    }
+  }
+
+  removeFriend(playerId: string): void {
+    this.send<RemoveFriendPayload>('remove_friend', { player_id: playerId });
+  }
+
+  getFriends(): void {
+    this.send('get_friends');
+  }
+
+  getFriendRequests(): void {
+    this.send('get_friend_requests');
+  }
+
+  acceptFriendRequest(playerId: string): void {
+    this.send<FriendRequestActionPayload>('accept_friend_request', { player_id: playerId });
+  }
+
+  declineFriendRequest(playerId: string): void {
+    this.send<FriendRequestActionPayload>('decline_friend_request', { player_id: playerId });
   }
 
   // Event handling
