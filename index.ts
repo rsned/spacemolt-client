@@ -97,13 +97,13 @@ client.on('connected', (data: { reconnected?: boolean }) => {
 client.on<RegisteredPayload>('registered', (data) => {
   console.log('\n=== Registration Successful ===');
   console.log(`Player ID: ${data.player_id}`);
-  console.log(`Token: ${data.token}`);
-  console.log('IMPORTANT: Save your token! It is your password.');
+  console.log(`Password: ${data.password}`);
+  console.log('IMPORTANT: Save your password! There is no recovery.');
   console.log('');
 
   // Save credentials
   if (credentials?.username) {
-    saveCredentials(credentials.username, data.token);
+    saveCredentials(credentials.username, data.password);
   }
 });
 

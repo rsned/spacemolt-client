@@ -314,7 +314,47 @@ export type MessageType =
   | 'forum_delete_reply'
   // API introspection
   | 'get_commands'
-  | 'commands';
+  | 'commands'
+  // Combat extras
+  | 'cloak'
+  | 'self_destruct'
+  // Faction extras
+  | 'faction_info'
+  | 'faction_list'
+  | 'faction_get_invites'
+  | 'faction_decline_invite'
+  | 'faction_set_ally'
+  | 'faction_set_enemy'
+  | 'faction_declare_war'
+  | 'faction_propose_peace'
+  | 'faction_accept_peace'
+  // Maps
+  | 'get_map'
+  | 'create_map'
+  | 'use_map'
+  // Notes
+  | 'create_note'
+  | 'write_note'
+  | 'read_note'
+  | 'get_notes'
+  // Base building
+  | 'build_base'
+  | 'get_base_cost'
+  // Base raiding
+  | 'attack_base'
+  | 'raid_status'
+  | 'get_base_wrecks'
+  | 'loot_base_wreck'
+  | 'salvage_base_wreck'
+  // Drones
+  | 'deploy_drone'
+  | 'recall_drone'
+  | 'order_drone'
+  | 'get_drones'
+  // Captain's log
+  | 'captains_log_add'
+  | 'captains_log_list'
+  | 'captains_log_get';
 
 export interface Message<T = unknown> {
   type: MessageType;
@@ -593,4 +633,202 @@ export interface CommandInfo {
 
 export interface CommandsPayload {
   commands: CommandInfo[];
+}
+
+// Cloaking
+export interface CloakPayload {
+  enable: boolean;
+}
+
+// Faction info/diplomacy
+export interface FactionInfoPayload {
+  faction_id?: string;
+}
+
+export interface FactionListPayload {
+  limit?: number;
+  offset?: number;
+}
+
+export interface FactionDeclineInvitePayload {
+  faction_id: string;
+}
+
+export interface FactionDiplomacyPayload {
+  target_faction_id: string;
+}
+
+export interface FactionDeclareWarPayload {
+  target_faction_id: string;
+  reason?: string;
+}
+
+export interface FactionProposePeacePayload {
+  target_faction_id: string;
+  terms?: string;
+}
+
+export interface Faction {
+  id: string;
+  name: string;
+  tag: string;
+  leader_id: string;
+  member_count: number;
+  created_at: string;
+  description?: string;
+  allies?: string[];
+  enemies?: string[];
+  at_war_with?: string[];
+}
+
+export interface FactionInvite {
+  faction_id: string;
+  faction_name: string;
+  faction_tag: string;
+  invited_by: string;
+  invited_at: string;
+}
+
+// Maps
+export interface GetMapPayload {
+  system_id?: string;
+}
+
+export interface CreateMapPayload {
+  name: string;
+  description?: string;
+  systems: string[];
+}
+
+export interface UseMapPayload {
+  map_item_id: string;
+}
+
+export interface DiscoveredSystem {
+  id: string;
+  name: string;
+  position: GalacticPosition;
+  police_level: number;
+  empire?: EmpireID;
+  discovered_at: string;
+  connections: string[];
+}
+
+// Notes/Documents
+export interface CreateNotePayload {
+  title: string;
+  content: string;
+}
+
+export interface WriteNotePayload {
+  note_id: string;
+  content: string;
+}
+
+export interface ReadNotePayload {
+  note_id: string;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  author_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Base Building
+export interface BuildBasePayload {
+  name: string;
+  description?: string;
+  type: 'outpost' | 'station' | 'fortress';
+  services: string[];
+  faction_base?: boolean;
+}
+
+export interface BaseCost {
+  type: 'outpost' | 'station' | 'fortress';
+  credits: number;
+  materials: CargoItem[];
+  skill_requirements: Record<string, number>;
+}
+
+// Base Raiding
+export interface AttackBasePayload {
+  base_id: string;
+}
+
+export interface LootBaseWreckPayload {
+  wreck_id: string;
+  item_id?: string;
+  quantity?: number;
+  credits?: boolean;
+}
+
+export interface SalvageBaseWreckPayload {
+  wreck_id: string;
+}
+
+export interface BaseWreck {
+  id: string;
+  poi_id: string;
+  base_name: string;
+  former_owner_id?: string;
+  contents: CargoItem[];
+  credits: number;
+  created_tick: number;
+  expires_tick: number;
+}
+
+export interface RaidStatus {
+  base_id: string;
+  base_name: string;
+  base_health: number;
+  max_health: number;
+  attackers: string[];
+  started_tick: number;
+}
+
+// Drones
+export interface DeployDronePayload {
+  drone_item_id: string;
+  target_id?: string;
+}
+
+export interface RecallDronePayload {
+  all?: boolean;
+  drone_id?: string;
+}
+
+export interface OrderDronePayload {
+  command: 'attack' | 'stop' | 'assist' | 'mine';
+  target_id?: string;
+}
+
+export interface Drone {
+  id: string;
+  type: 'combat' | 'mining' | 'repair' | 'salvage';
+  hull: number;
+  max_hull: number;
+  bandwidth: number;
+  target_id?: string;
+  status: 'idle' | 'attacking' | 'mining' | 'repairing';
+}
+
+// Captain's Log
+export interface CaptainsLogAddPayload {
+  entry: string;
+}
+
+export interface CaptainsLogGetPayload {
+  index: number;
+}
+
+export interface CaptainsLogEntry {
+  index: number;
+  entry: string;
+  created_at: string;
+  system?: string;
+  poi?: string;
 }

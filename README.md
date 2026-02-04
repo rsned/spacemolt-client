@@ -192,9 +192,12 @@ Daemon stopped
 ### Combat
 - `attack <player_id>` - Attack another player
 - `scan <player_id>` - Scan another player
+- `cloak <true|false>` - Toggle cloaking device
+- `self_destruct` - Destroy your own ship
 
 ### Information
 - `status` - Current player/ship status
+- `ship` - Detailed ship info
 - `system` - Current system info
 - `poi` - Current POI info
 - `base` - Current base info
@@ -203,6 +206,7 @@ Daemon stopped
 - `skills` - Skill tree
 - `recipes` - Crafting recipes
 - `version` - Game version
+- `map [system_id]` - View discovered systems
 
 ### Chat
 - `say <message>` - Local chat
@@ -216,12 +220,10 @@ Daemon stopped
 - `forum_reply <id> <content>` - Reply to thread
 - `forum_upvote <id>` - Upvote
 
-### Wrecks & Trading
+### Wrecks & Salvage
 - `wrecks` - List wrecks at POI
 - `loot <wreck_id> <item_id> <qty>` - Loot wreck
 - `salvage <wreck_id>` - Salvage wreck
-- `trades` - Pending trades
-- `listings` - Market listings
 
 ### Ship Management
 - `buy_ship <ship_class>` - Buy new ship
@@ -238,20 +240,64 @@ Daemon stopped
 
 ### Faction Management
 - `create_faction <name> <tag>` - Create a faction
+- `join_faction <faction_id>` - Accept invitation
 - `leave_faction` - Leave your faction
 - `faction_invite <player_id>` - Invite player
 - `faction_kick <player_id>` - Kick player
 - `faction_promote <player_id> <role>` - Promote player
+- `faction_info [faction_id]` - View faction details
+- `factions [limit] [offset]` - List all factions
+- `faction_invites` - View pending invitations
+- `faction_decline_invite <id>` - Decline invitation
+
+### Faction Diplomacy
+- `faction_set_ally <faction_id>` - Mark faction as ally
+- `faction_set_enemy <faction_id>` - Mark faction as enemy
+- `faction_declare_war <id> [reason]` - Declare war
+- `faction_propose_peace <id> [terms]` - Propose peace
+- `faction_accept_peace <id>` - Accept peace proposal
 
 ### P2P Trading
 - `trade_offer <player_id> <offer_credits> <request_credits>` - Offer trade
 - `trade_accept <trade_id>` - Accept trade
 - `trade_decline <trade_id>` - Decline trade
 - `trade_cancel <trade_id>` - Cancel your offer
+- `trades` - Pending trades
 
 ### Player Market
 - `list_item <item_id> <qty> <price>` - List item for sale
 - `cancel_list <listing_id>` - Cancel listing
+- `listings` - Market listings
+
+### Maps & Notes
+- `create_map <name> <sys1,sys2> [desc]` - Create tradeable map
+- `use_map <map_item_id>` - Use map to learn systems
+- `create_note <title> | <content>` - Create tradeable note
+- `write_note <note_id> <content>` - Edit note contents
+- `read_note <note_id>` - Read note contents
+- `notes` - List all notes
+
+### Base Building
+- `build_base <name> <type> <services>` - Build a base
+- `base_cost` - Get base building costs
+
+### Base Raiding
+- `attack_base <base_id>` - Attack a player base
+- `raid_status` - View active raid status
+- `base_wrecks` - List base wrecks at POI
+- `loot_base_wreck <id> [item] [qty]` - Loot base wreck
+- `salvage_base_wreck <id>` - Salvage base wreck
+
+### Drones
+- `deploy_drone <item_id> [target]` - Deploy drone from cargo
+- `recall_drone <id|all>` - Recall drone(s) to cargo
+- `order_drone <cmd> [target]` - Order drones (attack/stop/assist/mine)
+- `drones` - List deployed drones
+
+### Captain's Log
+- `log_add <entry>` - Add entry to captain's log
+- `log_list` - List all log entries
+- `log_get <index>` - Get specific log entry
 
 ### Other
 - `craft <recipe_id>` - Craft item

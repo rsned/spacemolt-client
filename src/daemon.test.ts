@@ -108,7 +108,7 @@ describe('Daemon Synchronization Integration', () => {
 
     // Simulate receiving a message from client
     async receiveMessage(msg: { type: string; payload?: any }) {
-      this.messagesReceived.push(msg);
+      this.messagesReceived.push({ type: msg.type, payload: msg.payload ?? {} });
       const handler = this.handlers.get(msg.type);
       if (handler) {
         // Simulate network latency
@@ -222,7 +222,7 @@ describe('Daemon Synchronization Integration', () => {
     const messages = daemon.flushMessages();
     // Error appears on NEXT command - this is the bug!
     expect(messages.filter(m => m.type === 'error')).toHaveLength(1);
-    expect((messages[0].data as any).code).toBe('username_not_found');
+    expect((messages[0]!.data as any).code).toBe('username_not_found');
   });
 
   test('fixed daemon: login error IS in immediate response', async () => {
@@ -239,8 +239,8 @@ describe('Daemon Synchronization Integration', () => {
     // FIXED: Error message is in the immediate response
     const errorMessages = response.messages.filter(m => m.type === 'error');
     expect(errorMessages).toHaveLength(1);
-    expect((errorMessages[0].data as any).code).toBe('username_not_found');
-    expect((errorMessages[0].data as any).message).toContain('invalid_user');
+    expect((errorMessages[0]!.data as any).code).toBe('username_not_found');
+    expect((errorMessages[0]!.data as any).message).toContain('invalid_user');
   });
 
   test('fixed daemon: successful login shows logged_in in immediate response', async () => {
@@ -256,6 +256,6 @@ describe('Daemon Synchronization Integration', () => {
     // logged_in message is in immediate response
     const loginMessages = response.messages.filter(m => m.type === 'logged_in');
     expect(loginMessages).toHaveLength(1);
-    expect((loginMessages[0].data as any).player.username).toBe('valid_user');
+    expect((loginMessages[0]!.data as any).player.username).toBe('valid_user');
   });
 });

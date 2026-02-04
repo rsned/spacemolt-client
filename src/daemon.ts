@@ -96,6 +96,9 @@ let connectedClients: Set<Socket<{ buffer: string }>> = new Set();
 // Cached command info from server (for dynamic help generation)
 let commandInfo: CommandInfo[] = [];
 
+// Flag to prevent double-queueing auth responses during explicit login/register
+let waitingForExplicitAuth = false;
+
 // Load saved credentials
 async function loadCredentials(): Promise<void> {
   try {
@@ -176,7 +179,10 @@ function setupClientHandlers(): void {
   });
 
   client.on<RegisteredPayload>('registered', (data) => {
-    queueMessage('registered', data);
+    // Don't queue if explicit auth command is waiting (it handles the response directly)
+    if (!waitingForExplicitAuth) {
+      queueMessage('registered', data);
+    }
 
     // Save credentials if we have the username
     if (credentials?.username) {
@@ -185,10 +191,17 @@ function setupClientHandlers(): void {
   });
 
   client.on<LoggedInPayload>('logged_in', (data) => {
-    queueMessage('logged_in', data);
+    // Don't queue if explicit auth command is waiting (it handles the response directly)
+    if (!waitingForExplicitAuth) {
+      queueMessage('logged_in', data);
+    }
   });
 
   client.on<ErrorPayload>('error', (data) => {
+    // Don't queue auth errors if explicit auth command is waiting
+    if (waitingForExplicitAuth && (data.code === 'username_not_found' || data.code === 'invalid_password' || data.code === 'username_taken' || data.code === 'invalid_empire')) {
+      return;
+    }
     queueMessage('error', data);
   });
 
@@ -214,82 +227,192 @@ function setupClientHandlers(): void {
 
   // Travel/arrival events
   client.on('arrived', (data) => {
-    queueMessage('travel', { type: 'arrived', ...data });
+    queueMessage('travel', { type: 'arrived', ...(data as Record<string, unknown>) });
   });
 
   // Combat events
   client.on('combat_hit', (data) => {
-    queueMessage('combat', { type: 'hit', ...data });
+    queueMessage('combat', { type: 'hit', ...(data as Record<string, unknown>) });
   });
 
   client.on('combat_miss', (data) => {
-    queueMessage('combat', { type: 'miss', ...data });
+    queueMessage('combat', { type: 'miss', ...(data as Record<string, unknown>) });
   });
 
   client.on('player_destroyed', (data) => {
-    queueMessage('combat', { type: 'destroyed', ...data });
+    queueMessage('combat', { type: 'destroyed', ...(data as Record<string, unknown>) });
   });
 
   // System/POI/Base info responses
   client.on('system_info', (data) => {
-    queueMessage('ok', { action: 'get_system', ...data });
+    queueMessage('ok', { action: 'get_system', ...(data as Record<string, unknown>) });
   });
 
   client.on('poi_info', (data) => {
-    queueMessage('ok', { action: 'get_poi', ...data });
+    queueMessage('ok', { action: 'get_poi', ...(data as Record<string, unknown>) });
   });
 
   client.on('base_info', (data) => {
-    queueMessage('ok', { action: 'get_base', ...data });
+    queueMessage('ok', { action: 'get_base', ...(data as Record<string, unknown>) });
   });
 
   client.on('wrecks', (data) => {
-    queueMessage('ok', { action: 'get_wrecks', ...data });
+    queueMessage('ok', { action: 'get_wrecks', ...(data as Record<string, unknown>) });
   });
 
   client.on('trades', (data) => {
-    queueMessage('ok', { action: 'get_trades', ...data });
+    queueMessage('ok', { action: 'get_trades', ...(data as Record<string, unknown>) });
   });
 
   client.on('listings', (data) => {
-    queueMessage('ok', { action: 'get_listings', ...data });
+    queueMessage('ok', { action: 'get_listings', ...(data as Record<string, unknown>) });
   });
 
   client.on('skills', (data) => {
-    queueMessage('ok', { action: 'get_skills', ...data });
+    queueMessage('ok', { action: 'get_skills', ...(data as Record<string, unknown>) });
   });
 
   client.on('recipes', (data) => {
-    queueMessage('ok', { action: 'get_recipes', ...data });
+    queueMessage('ok', { action: 'get_recipes', ...(data as Record<string, unknown>) });
   });
 
   client.on('version_info', (data) => {
-    queueMessage('ok', { action: 'get_version', ...data });
+    queueMessage('ok', { action: 'get_version', ...(data as Record<string, unknown>) });
   });
 
   // Forum responses
   client.on('forum_list', (data) => {
-    queueMessage('ok', { action: 'forum_list', ...data });
+    queueMessage('ok', { action: 'forum_list', ...(data as Record<string, unknown>) });
   });
 
   client.on('forum_thread', (data) => {
-    queueMessage('ok', { action: 'forum_thread', ...data });
+    queueMessage('ok', { action: 'forum_thread', ...(data as Record<string, unknown>) });
   });
 
   // Scan result
   client.on('scan_result', (data) => {
-    queueMessage('ok', { action: 'scan', ...data });
+    queueMessage('ok', { action: 'scan', ...(data as Record<string, unknown>) });
   });
 
   // Trade offer received
   client.on('trade_offer_received', (data) => {
-    queueMessage('system', { message: 'Trade offer received!', ...data });
+    queueMessage('system', { message: 'Trade offer received!', ...(data as Record<string, unknown>) });
   });
 
   // Command list for dynamic help
   client.on<CommandsPayload>('commands', (data) => {
     commandInfo = data.commands;
     if (DEBUG) console.log(`[Daemon] Received ${commandInfo.length} command definitions from server`);
+  });
+
+  // Faction responses
+  client.on('faction_info', (data) => {
+    queueMessage('ok', { action: 'faction_info', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('faction_list', (data) => {
+    queueMessage('ok', { action: 'faction_list', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('faction_invites', (data) => {
+    queueMessage('ok', { action: 'faction_get_invites', ...(data as Record<string, unknown>) });
+  });
+
+  // Map responses
+  client.on('map', (data) => {
+    queueMessage('ok', { action: 'get_map', ...(data as Record<string, unknown>) });
+  });
+
+  // Notes responses
+  client.on('notes', (data) => {
+    queueMessage('ok', { action: 'get_notes', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('note', (data) => {
+    queueMessage('ok', { action: 'read_note', ...(data as Record<string, unknown>) });
+  });
+
+  // Base cost response
+  client.on('base_cost', (data) => {
+    queueMessage('ok', { action: 'get_base_cost', ...(data as Record<string, unknown>) });
+  });
+
+  // Base wrecks response
+  client.on('base_wrecks', (data) => {
+    queueMessage('ok', { action: 'get_base_wrecks', ...(data as Record<string, unknown>) });
+  });
+
+  // Raid status response
+  client.on('raid_status', (data) => {
+    queueMessage('ok', { action: 'raid_status', ...(data as Record<string, unknown>) });
+  });
+
+  // Base raid events
+  client.on('base_raid_update', (data) => {
+    queueMessage('combat', { type: 'base_raid', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('base_destroyed', (data) => {
+    queueMessage('combat', { type: 'base_destroyed', ...(data as Record<string, unknown>) });
+  });
+
+  // Drone responses
+  client.on('drones', (data) => {
+    queueMessage('ok', { action: 'get_drones', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('drone_update', (data) => {
+    queueMessage('combat', { type: 'drone_update', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('drone_destroyed', (data) => {
+    queueMessage('combat', { type: 'drone_destroyed', ...(data as Record<string, unknown>) });
+  });
+
+  // Captain's log responses
+  client.on('captains_log', (data) => {
+    queueMessage('ok', { action: 'captains_log_list', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('captains_log_entry', (data) => {
+    queueMessage('ok', { action: 'captains_log_get', ...(data as Record<string, unknown>) });
+  });
+
+  // Ship info response
+  client.on('ship_info', (data) => {
+    queueMessage('ok', { action: 'get_ship', ...(data as Record<string, unknown>) });
+  });
+
+  // Cloak events
+  client.on('cloaked', (data) => {
+    queueMessage('ok', { action: 'cloak', enabled: true, ...(data as Record<string, unknown>) });
+  });
+
+  client.on('uncloaked', (data) => {
+    queueMessage('ok', { action: 'cloak', enabled: false, ...(data as Record<string, unknown>) });
+  });
+
+  // Police events
+  client.on('police_warning', (data) => {
+    queueMessage('system', { message: 'Police warning!', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('police_spawn', (data) => {
+    queueMessage('combat', { type: 'police_spawn', ...(data as Record<string, unknown>) });
+  });
+
+  client.on('police_combat', (data) => {
+    queueMessage('combat', { type: 'police_combat', ...(data as Record<string, unknown>) });
+  });
+
+  // Player death
+  client.on('player_died', (data) => {
+    queueMessage('combat', { type: 'player_died', ...(data as Record<string, unknown>) });
+  });
+
+  // Skill level up
+  client.on('skill_level_up', (data) => {
+    queueMessage('system', { message: 'Skill level up!', ...(data as Record<string, unknown>) });
   });
 }
 
@@ -421,10 +544,16 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         }
         credentials = { username, password: '' };
 
+        // Set flag to prevent double-queueing
+        waitingForExplicitAuth = true;
+
         // Wait for server response (registered or error)
         const registerResult = await waitForAuthResponse('registered');
         client.register(username, empire as any);
         const registerResponse = await registerResult.promise;
+
+        // Clear flag
+        waitingForExplicitAuth = false;
 
         // Include the server response in messages
         messages.push({
@@ -453,10 +582,16 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         }
         await saveCredentials(username, password);
 
+        // Set flag to prevent double-queueing
+        waitingForExplicitAuth = true;
+
         // Wait for server response (logged_in or error)
         const loginResult = await waitForAuthResponse('logged_in');
         client.login(username, password);
         const loginResponse = await loginResult.promise;
+
+        // Clear flag
+        waitingForExplicitAuth = false;
 
         // Include the server response in messages
         messages.push({
@@ -921,6 +1056,305 @@ async function processCommand(request: IPCRequest): Promise<IPCResponse> {
         client.getVersion();
         return { id, success: true, messages, response: { action: 'get_version' } };
 
+      // Combat - Additional
+      case 'cloak': {
+        const [enableStr] = args;
+        if (!enableStr) {
+          return { id, success: false, messages, error: 'Usage: cloak <true|false>' };
+        }
+        const enable = enableStr.toLowerCase() === 'true';
+        client.cloak(enable);
+        return { id, success: true, messages, response: { action: 'cloak', enable } };
+      }
+
+      case 'self_destruct':
+        client.selfDestruct();
+        return { id, success: true, messages, response: { action: 'self_destruct' } };
+
+      // Faction - Additional
+      case 'faction_info': {
+        const [factionId] = args;
+        client.factionInfo(factionId);
+        return { id, success: true, messages, response: { action: 'faction_info', faction_id: factionId } };
+      }
+
+      case 'faction_list':
+      case 'factions': {
+        const limitStr = args[0];
+        const offsetStr = args[1];
+        const limit = limitStr ? parseInt(limitStr) : undefined;
+        const offset = offsetStr ? parseInt(offsetStr) : undefined;
+        client.factionList(limit, offset);
+        return { id, success: true, messages, response: { action: 'faction_list', limit, offset } };
+      }
+
+      case 'faction_get_invites':
+      case 'faction_invites':
+        client.factionGetInvites();
+        return { id, success: true, messages, response: { action: 'faction_get_invites' } };
+
+      case 'faction_decline_invite': {
+        const [factionId] = args;
+        if (!factionId) {
+          return { id, success: false, messages, error: 'Usage: faction_decline_invite <faction_id>' };
+        }
+        client.factionDeclineInvite(factionId);
+        return { id, success: true, messages, response: { action: 'faction_decline_invite', faction_id: factionId } };
+      }
+
+      case 'faction_set_ally': {
+        const [targetFactionId] = args;
+        if (!targetFactionId) {
+          return { id, success: false, messages, error: 'Usage: faction_set_ally <target_faction_id>' };
+        }
+        client.factionSetAlly(targetFactionId);
+        return { id, success: true, messages, response: { action: 'faction_set_ally', target_faction_id: targetFactionId } };
+      }
+
+      case 'faction_set_enemy': {
+        const [targetFactionId] = args;
+        if (!targetFactionId) {
+          return { id, success: false, messages, error: 'Usage: faction_set_enemy <target_faction_id>' };
+        }
+        client.factionSetEnemy(targetFactionId);
+        return { id, success: true, messages, response: { action: 'faction_set_enemy', target_faction_id: targetFactionId } };
+      }
+
+      case 'faction_declare_war': {
+        const [targetFactionId, ...reasonParts] = args;
+        if (!targetFactionId) {
+          return { id, success: false, messages, error: 'Usage: faction_declare_war <target_faction_id> [reason]' };
+        }
+        const reason = reasonParts.length > 0 ? reasonParts.join(' ') : undefined;
+        client.factionDeclareWar(targetFactionId, reason);
+        return { id, success: true, messages, response: { action: 'faction_declare_war', target_faction_id: targetFactionId, reason } };
+      }
+
+      case 'faction_propose_peace': {
+        const [targetFactionId, ...termsParts] = args;
+        if (!targetFactionId) {
+          return { id, success: false, messages, error: 'Usage: faction_propose_peace <target_faction_id> [terms]' };
+        }
+        const terms = termsParts.length > 0 ? termsParts.join(' ') : undefined;
+        client.factionProposePeace(targetFactionId, terms);
+        return { id, success: true, messages, response: { action: 'faction_propose_peace', target_faction_id: targetFactionId, terms } };
+      }
+
+      case 'faction_accept_peace': {
+        const [targetFactionId] = args;
+        if (!targetFactionId) {
+          return { id, success: false, messages, error: 'Usage: faction_accept_peace <target_faction_id>' };
+        }
+        client.factionAcceptPeace(targetFactionId);
+        return { id, success: true, messages, response: { action: 'faction_accept_peace', target_faction_id: targetFactionId } };
+      }
+
+      case 'join_faction': {
+        const [factionId] = args;
+        if (!factionId) {
+          return { id, success: false, messages, error: 'Usage: join_faction <faction_id>' };
+        }
+        client.joinFaction(factionId);
+        return { id, success: true, messages, response: { action: 'join_faction', faction_id: factionId } };
+      }
+
+      // Maps
+      case 'map':
+      case 'get_map': {
+        const [systemId] = args;
+        client.getMap(systemId);
+        return { id, success: true, messages, response: { action: 'get_map', system_id: systemId } };
+      }
+
+      case 'create_map': {
+        // Usage: create_map <name> <system1,system2,...> [description]
+        const [name, systemsStr, ...descParts] = args;
+        if (!name || !systemsStr) {
+          return { id, success: false, messages, error: 'Usage: create_map <name> <system1,system2,...> [description]' };
+        }
+        const systems = systemsStr.split(',');
+        const description = descParts.length > 0 ? descParts.join(' ') : undefined;
+        client.createMap(name, systems, description);
+        return { id, success: true, messages, response: { action: 'create_map', name, systems } };
+      }
+
+      case 'use_map': {
+        const [mapItemId] = args;
+        if (!mapItemId) {
+          return { id, success: false, messages, error: 'Usage: use_map <map_item_id>' };
+        }
+        client.useMap(mapItemId);
+        return { id, success: true, messages, response: { action: 'use_map', map_item_id: mapItemId } };
+      }
+
+      // Notes/Documents
+      case 'create_note': {
+        // Usage: create_note <title> | <content>
+        const rest = args.join(' ');
+        const pipeIndex = rest.indexOf('|');
+        if (pipeIndex === -1) {
+          return { id, success: false, messages, error: 'Usage: create_note <title> | <content>' };
+        }
+        const title = rest.substring(0, pipeIndex).trim();
+        const content = rest.substring(pipeIndex + 1).trim();
+        client.createNote(title, content);
+        return { id, success: true, messages, response: { action: 'create_note', title } };
+      }
+
+      case 'write_note': {
+        // Usage: write_note <note_id> <content>
+        const [noteId, ...contentParts] = args;
+        if (!noteId || contentParts.length === 0) {
+          return { id, success: false, messages, error: 'Usage: write_note <note_id> <content>' };
+        }
+        const content = contentParts.join(' ');
+        client.writeNote(noteId, content);
+        return { id, success: true, messages, response: { action: 'write_note', note_id: noteId } };
+      }
+
+      case 'read_note': {
+        const [noteId] = args;
+        if (!noteId) {
+          return { id, success: false, messages, error: 'Usage: read_note <note_id>' };
+        }
+        client.readNote(noteId);
+        return { id, success: true, messages, response: { action: 'read_note', note_id: noteId } };
+      }
+
+      case 'notes':
+      case 'get_notes':
+        client.getNotes();
+        return { id, success: true, messages, response: { action: 'get_notes' } };
+
+      // Base Building
+      case 'build_base': {
+        // Usage: build_base <name> <type> <services> [description]
+        // type: outpost, station, fortress
+        // services: comma-separated (refuel,repair,market,etc.)
+        const [name, type, servicesStr, ...descParts] = args;
+        if (!name || !type || !servicesStr) {
+          return { id, success: false, messages, error: 'Usage: build_base <name> <type> <services> [description]\n  type: outpost|station|fortress\n  services: comma-separated (refuel,repair,market,storage,cloning,crafting)' };
+        }
+        const services = servicesStr.split(',');
+        const description = descParts.length > 0 ? descParts.join(' ') : undefined;
+        client.buildBase(name, type as 'outpost' | 'station' | 'fortress', services, description);
+        return { id, success: true, messages, response: { action: 'build_base', name, type, services } };
+      }
+
+      case 'get_base_cost':
+      case 'base_cost':
+        client.getBaseCost();
+        return { id, success: true, messages, response: { action: 'get_base_cost' } };
+
+      // Base Raiding
+      case 'attack_base': {
+        const [baseId] = args;
+        if (!baseId) {
+          return { id, success: false, messages, error: 'Usage: attack_base <base_id>' };
+        }
+        client.attackBase(baseId);
+        return { id, success: true, messages, response: { action: 'attack_base', base_id: baseId } };
+      }
+
+      case 'raid_status':
+        client.getRaidStatus();
+        return { id, success: true, messages, response: { action: 'raid_status' } };
+
+      case 'base_wrecks':
+      case 'get_base_wrecks':
+        client.getBaseWrecks();
+        return { id, success: true, messages, response: { action: 'get_base_wrecks' } };
+
+      case 'loot_base_wreck': {
+        const [wreckId, itemId, quantityStr] = args;
+        if (!wreckId) {
+          return { id, success: false, messages, error: 'Usage: loot_base_wreck <wreck_id> [item_id] [quantity]' };
+        }
+        const quantity = quantityStr ? parseInt(quantityStr) : undefined;
+        client.lootBaseWreck(wreckId, itemId, quantity);
+        return { id, success: true, messages, response: { action: 'loot_base_wreck', wreck_id: wreckId } };
+      }
+
+      case 'salvage_base_wreck': {
+        const [wreckId] = args;
+        if (!wreckId) {
+          return { id, success: false, messages, error: 'Usage: salvage_base_wreck <wreck_id>' };
+        }
+        client.salvageBaseWreck(wreckId);
+        return { id, success: true, messages, response: { action: 'salvage_base_wreck', wreck_id: wreckId } };
+      }
+
+      // Drones
+      case 'deploy_drone': {
+        const [droneItemId, targetId] = args;
+        if (!droneItemId) {
+          return { id, success: false, messages, error: 'Usage: deploy_drone <drone_item_id> [target_id]' };
+        }
+        client.deployDrone(droneItemId, targetId);
+        return { id, success: true, messages, response: { action: 'deploy_drone', drone_item_id: droneItemId, target_id: targetId } };
+      }
+
+      case 'recall_drone': {
+        const [arg] = args;
+        if (arg === 'all') {
+          client.recallDrone(undefined, true);
+          return { id, success: true, messages, response: { action: 'recall_drone', all: true } };
+        }
+        client.recallDrone(arg);
+        return { id, success: true, messages, response: { action: 'recall_drone', drone_id: arg } };
+      }
+
+      case 'order_drone': {
+        const [cmd, targetId] = args;
+        if (!cmd) {
+          return { id, success: false, messages, error: 'Usage: order_drone <attack|stop|assist|mine> [target_id]' };
+        }
+        const validCommands = ['attack', 'stop', 'assist', 'mine'];
+        if (!validCommands.includes(cmd)) {
+          return { id, success: false, messages, error: `Invalid command. Use one of: ${validCommands.join(', ')}` };
+        }
+        client.orderDrone(cmd as 'attack' | 'stop' | 'assist' | 'mine', targetId);
+        return { id, success: true, messages, response: { action: 'order_drone', command: cmd, target_id: targetId } };
+      }
+
+      case 'drones':
+      case 'get_drones':
+        client.getDrones();
+        return { id, success: true, messages, response: { action: 'get_drones' } };
+
+      // Captain's Log
+      case 'log_add':
+      case 'captains_log_add': {
+        const entry = args.join(' ');
+        if (!entry) {
+          return { id, success: false, messages, error: 'Usage: captains_log_add <entry>' };
+        }
+        client.captainsLogAdd(entry);
+        return { id, success: true, messages, response: { action: 'captains_log_add' } };
+      }
+
+      case 'log_list':
+      case 'captains_log_list':
+        client.captainsLogList();
+        return { id, success: true, messages, response: { action: 'captains_log_list' } };
+
+      case 'log_get':
+      case 'captains_log_get': {
+        const [indexStr] = args;
+        if (!indexStr) {
+          return { id, success: false, messages, error: 'Usage: captains_log_get <index>' };
+        }
+        const index = parseInt(indexStr);
+        client.captainsLogGet(index);
+        return { id, success: true, messages, response: { action: 'captains_log_get', index } };
+      }
+
+      // Ship info
+      case 'ship':
+      case 'get_ship':
+        client.getShip();
+        return { id, success: true, messages, response: { action: 'get_ship' } };
+
       // Daemon control
       case 'stop':
       case 'shutdown':
@@ -961,6 +1395,8 @@ function generateDynamicHelpText(): string {
   let helpText = '';
   for (const category of sortedCategories) {
     const commands = categories[category];
+    if (!commands) continue;
+
     // Capitalize category name
     const categoryTitle = category.charAt(0).toUpperCase() + category.slice(1);
     helpText += `\n=== ${categoryTitle} ===\n`;
@@ -986,7 +1422,7 @@ SpaceMolt Client (Daemon Mode)
 ==============================
 
 Connection Commands:
-  register <username> <empire>  - Create new account (empires: solarian, voidborn, crimson, nebula, outerrim)
+  register <username> <empire>  - Create new account (empires: solarian)
   login <username> <password>   - Login to existing account
   logout                        - Logout
 
@@ -1006,8 +1442,11 @@ Mining & Trading:
 Combat:
   attack <player_id>            - Attack another player
   scan <player_id>              - Scan another player
+  cloak <true|false>            - Toggle cloaking device
+  self_destruct                 - Destroy your own ship
 
 Ship Management:
+  ship                          - Show detailed ship info
   buy_ship <ship_class>         - Buy a new ship
   set_home_base                 - Set current base as home
   install_mod <mod_id> <slot>   - Install module in slot
@@ -1025,6 +1464,7 @@ Information:
   skills                        - Show skill tree
   recipes                       - Show crafting recipes
   version                       - Show game version
+  map [system_id]               - Show discovered systems
 
 Profile:
   set_status <msg> [tag]        - Set status message and clan tag
@@ -1038,10 +1478,22 @@ Chat:
 
 Faction Management:
   create_faction <name> <tag>   - Create a new faction
+  join_faction <faction_id>     - Accept faction invitation
   leave_faction                 - Leave current faction
   faction_invite <player_id>    - Invite player to faction
   faction_kick <player_id>      - Kick player from faction
   faction_promote <id> <role>   - Promote player to role
+  faction_info [faction_id]     - View faction details
+  factions [limit] [offset]     - List all factions
+  faction_invites               - View pending invitations
+  faction_decline_invite <id>   - Decline invitation
+
+Faction Diplomacy:
+  faction_set_ally <faction_id> - Mark faction as ally
+  faction_set_enemy <faction_id> - Mark faction as enemy
+  faction_declare_war <id> [reason] - Declare war
+  faction_propose_peace <id> [terms] - Propose peace
+  faction_accept_peace <id>     - Accept peace proposal
 
 Forum:
   forum [page] [category]       - List forum threads
@@ -1066,6 +1518,36 @@ Player Market:
   list_item <item> <qty> <price> - List item for sale
   cancel_list <listing_id>      - Cancel a listing
   listings                      - List market listings
+
+Maps & Notes:
+  create_map <name> <sys1,sys2> [desc] - Create tradeable map
+  use_map <map_item_id>         - Use map to learn systems
+  create_note <title> | <content> - Create tradeable note
+  write_note <note_id> <content> - Edit note contents
+  read_note <note_id>           - Read note contents
+  notes                         - List all notes
+
+Base Building:
+  build_base <name> <type> <services> - Build a base
+  base_cost                     - Get base building costs
+
+Base Raiding:
+  attack_base <base_id>         - Attack a player base
+  raid_status                   - View active raid status
+  base_wrecks                   - List base wrecks at POI
+  loot_base_wreck <id> [item] [qty] - Loot base wreck
+  salvage_base_wreck <id>       - Salvage base wreck
+
+Drones:
+  deploy_drone <item_id> [target] - Deploy drone from cargo
+  recall_drone <id|all>         - Recall drone(s) to cargo
+  order_drone <cmd> [target]    - Order drones (attack/stop/assist/mine)
+  drones                        - List deployed drones
+
+Captain's Log:
+  log_add <entry>               - Add entry to captain's log
+  log_list                      - List all log entries
+  log_get <index>               - Get specific log entry
 
 Daemon:
   stop                          - Stop the daemon
@@ -1130,6 +1612,11 @@ async function shutdown(): Promise<void> {
 // Handle messages from CLI clients
 async function handleClientData(socket: Socket<{ buffer: string }>, data: Buffer): Promise<void> {
   try {
+    // Initialize buffer if needed
+    if (!socket.data) {
+      socket.data = { buffer: '' };
+    }
+
     // Append to buffer
     socket.data.buffer += data.toString();
 
@@ -1138,7 +1625,7 @@ async function handleClientData(socket: Socket<{ buffer: string }>, data: Buffer
 
     // Process complete lines
     for (let i = 0; i < lines.length - 1; i++) {
-      const line = lines[i].trim();
+      const line = lines[i]?.trim();
       if (!line) continue;
 
       try {
@@ -1159,7 +1646,7 @@ async function handleClientData(socket: Socket<{ buffer: string }>, data: Buffer
     }
 
     // Keep the last incomplete line in the buffer
-    socket.data.buffer = lines[lines.length - 1];
+    socket.data.buffer = lines[lines.length - 1] ?? '';
 
   } catch (error) {
     console.error('[Daemon] Error handling data:', error);

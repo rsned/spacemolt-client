@@ -149,7 +149,7 @@ async function sendCommand(command: string, args: string[]): Promise<IPCResponse
           // Try to parse newline-delimited JSON
           const lines = responseBuffer.split('\n');
           for (let i = 0; i < lines.length - 1; i++) {
-            const line = lines[i].trim();
+            const line = lines[i]?.trim();
             if (!line) continue;
 
             try {
@@ -164,7 +164,7 @@ async function sendCommand(command: string, args: string[]): Promise<IPCResponse
           }
 
           // Keep incomplete data in buffer
-          responseBuffer = lines[lines.length - 1];
+          responseBuffer = lines[lines.length - 1] ?? '';
         },
         open(socket) {
           // Send request with newline delimiter
@@ -658,7 +658,7 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  const command = args[0].toLowerCase();
+  const command = args[0]!.toLowerCase();
   const commandArgs = args.slice(1);
 
   // Special handling for local help

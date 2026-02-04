@@ -47,6 +47,29 @@ import type {
   ForumDeleteThreadPayload,
   ForumDeleteReplyPayload,
   CommandsPayload,
+  // New types
+  CloakPayload,
+  FactionInfoPayload,
+  FactionListPayload,
+  FactionDeclineInvitePayload,
+  FactionDiplomacyPayload,
+  FactionDeclareWarPayload,
+  FactionProposePeacePayload,
+  GetMapPayload,
+  CreateMapPayload,
+  UseMapPayload,
+  CreateNotePayload,
+  WriteNotePayload,
+  ReadNotePayload,
+  BuildBasePayload,
+  AttackBasePayload,
+  LootBaseWreckPayload,
+  SalvageBaseWreckPayload,
+  DeployDronePayload,
+  RecallDronePayload,
+  OrderDronePayload,
+  CaptainsLogAddPayload,
+  CaptainsLogGetPayload,
 } from './types';
 
 export type EventHandler<T> = (data: T) => void;
@@ -611,6 +634,150 @@ export class SpaceMoltClient {
 
   forumDeleteReply(replyId: string): void {
     this.send<ForumDeleteReplyPayload>('forum_delete_reply', { reply_id: replyId });
+  }
+
+  // Combat - Additional
+
+  cloak(enable: boolean): void {
+    this.send<CloakPayload>('cloak', { enable });
+  }
+
+  selfDestruct(): void {
+    this.send('self_destruct');
+  }
+
+  // Faction - Additional
+
+  factionInfo(factionId?: string): void {
+    this.send<FactionInfoPayload>('faction_info', factionId ? { faction_id: factionId } : {});
+  }
+
+  factionList(limit?: number, offset?: number): void {
+    this.send<FactionListPayload>('faction_list', { limit, offset });
+  }
+
+  factionGetInvites(): void {
+    this.send('faction_get_invites');
+  }
+
+  factionDeclineInvite(factionId: string): void {
+    this.send<FactionDeclineInvitePayload>('faction_decline_invite', { faction_id: factionId });
+  }
+
+  factionSetAlly(targetFactionId: string): void {
+    this.send<FactionDiplomacyPayload>('faction_set_ally', { target_faction_id: targetFactionId });
+  }
+
+  factionSetEnemy(targetFactionId: string): void {
+    this.send<FactionDiplomacyPayload>('faction_set_enemy', { target_faction_id: targetFactionId });
+  }
+
+  factionDeclareWar(targetFactionId: string, reason?: string): void {
+    this.send<FactionDeclareWarPayload>('faction_declare_war', { target_faction_id: targetFactionId, reason });
+  }
+
+  factionProposePeace(targetFactionId: string, terms?: string): void {
+    this.send<FactionProposePeacePayload>('faction_propose_peace', { target_faction_id: targetFactionId, terms });
+  }
+
+  factionAcceptPeace(targetFactionId: string): void {
+    this.send<FactionDiplomacyPayload>('faction_accept_peace', { target_faction_id: targetFactionId });
+  }
+
+  // Maps
+
+  getMap(systemId?: string): void {
+    this.send<GetMapPayload>('get_map', systemId ? { system_id: systemId } : {});
+  }
+
+  createMap(name: string, systems: string[], description?: string): void {
+    this.send<CreateMapPayload>('create_map', { name, systems, description });
+  }
+
+  useMap(mapItemId: string): void {
+    this.send<UseMapPayload>('use_map', { map_item_id: mapItemId });
+  }
+
+  // Notes/Documents
+
+  createNote(title: string, content: string): void {
+    this.send<CreateNotePayload>('create_note', { title, content });
+  }
+
+  writeNote(noteId: string, content: string): void {
+    this.send<WriteNotePayload>('write_note', { note_id: noteId, content });
+  }
+
+  readNote(noteId: string): void {
+    this.send<ReadNotePayload>('read_note', { note_id: noteId });
+  }
+
+  getNotes(): void {
+    this.send('get_notes');
+  }
+
+  // Base Building
+
+  buildBase(name: string, type: 'outpost' | 'station' | 'fortress', services: string[], description?: string, factionBase?: boolean): void {
+    this.send<BuildBasePayload>('build_base', { name, type, services, description, faction_base: factionBase });
+  }
+
+  getBaseCost(): void {
+    this.send('get_base_cost');
+  }
+
+  // Base Raiding
+
+  attackBase(baseId: string): void {
+    this.send<AttackBasePayload>('attack_base', { base_id: baseId });
+  }
+
+  getRaidStatus(): void {
+    this.send('raid_status');
+  }
+
+  getBaseWrecks(): void {
+    this.send('get_base_wrecks');
+  }
+
+  lootBaseWreck(wreckId: string, itemId?: string, quantity?: number, credits?: boolean): void {
+    this.send<LootBaseWreckPayload>('loot_base_wreck', { wreck_id: wreckId, item_id: itemId, quantity, credits });
+  }
+
+  salvageBaseWreck(wreckId: string): void {
+    this.send<SalvageBaseWreckPayload>('salvage_base_wreck', { wreck_id: wreckId });
+  }
+
+  // Drones
+
+  deployDrone(droneItemId: string, targetId?: string): void {
+    this.send<DeployDronePayload>('deploy_drone', { drone_item_id: droneItemId, target_id: targetId });
+  }
+
+  recallDrone(droneId?: string, all?: boolean): void {
+    this.send<RecallDronePayload>('recall_drone', { drone_id: droneId, all });
+  }
+
+  orderDrone(command: 'attack' | 'stop' | 'assist' | 'mine', targetId?: string): void {
+    this.send<OrderDronePayload>('order_drone', { command, target_id: targetId });
+  }
+
+  getDrones(): void {
+    this.send('get_drones');
+  }
+
+  // Captain's Log
+
+  captainsLogAdd(entry: string): void {
+    this.send<CaptainsLogAddPayload>('captains_log_add', { entry });
+  }
+
+  captainsLogList(): void {
+    this.send('captains_log_list');
+  }
+
+  captainsLogGet(index: number): void {
+    this.send<CaptainsLogGetPayload>('captains_log_get', { index });
   }
 
   // Event handling
