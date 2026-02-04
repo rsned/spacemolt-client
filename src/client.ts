@@ -222,7 +222,9 @@ const ERROR_HELP: Record<string, string> = {
 // =============================================================================
 
 function getSessionPath(): string {
-  return process.env.SPACEMOLT_SESSION || path.join(os.homedir(), '.config', 'spacemolt', 'session.json');
+  // Use current working directory by default (not home directory)
+  // This keeps credentials local to the project, avoiding global state
+  return process.env.SPACEMOLT_SESSION || path.join(process.cwd(), '.spacemolt-session.json');
 }
 
 async function loadSession(): Promise<Session | null> {

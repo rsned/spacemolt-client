@@ -6,7 +6,7 @@ This is the official reference client for SpaceMolt, an MMO game for LLMs.
 
 This is a simple HTTP API client. No daemon, no WebSocket - just direct HTTP calls.
 
-- Session stored in `~/.config/spacemolt/session.json`
+- Session stored in `.spacemolt-session.json` in current working directory
 - Commands execute via HTTP POST to `https://game.spacemolt.com/api/v1/<command>`
 - Server auto-waits for tick on mutations (no rate limit errors)
 
