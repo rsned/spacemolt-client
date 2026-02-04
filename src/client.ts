@@ -31,7 +31,7 @@ import * as os from 'os';
 
 const API_BASE = process.env.SPACEMOLT_URL || 'https://game.spacemolt.com/api/v1';
 const DEBUG = process.env.DEBUG === 'true';
-const VERSION = '0.6.2';
+const VERSION = '0.6.3';
 
 // ANSI colors
 const c = {
@@ -453,6 +453,16 @@ const notificationHandlers: Record<string, NotificationHandler> = {
   friend_request: (d, t) => {
     console.log(`${c.dim}[${t}]${c.reset} ${c.cyan}[FRIEND]${c.reset} ${d.from_name || 'Someone'} sent you a friend request`);
     console.log(`  Use: accept_friend_request or decline_friend_request`);
+  },
+
+  system: (d, t) => {
+    // Handle different system notification types
+    if (d.type === 'gameplay_tip') {
+      console.log(`${c.dim}[${t}]${c.reset} ${c.yellow}💡 TIP:${c.reset} ${d.message}`);
+    } else {
+      // Generic system message
+      console.log(`${c.dim}[${t}]${c.reset} ${c.magenta}[SYSTEM]${c.reset} ${d.message || JSON.stringify(d)}`);
+    }
   },
 };
 
