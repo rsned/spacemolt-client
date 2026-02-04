@@ -6,6 +6,9 @@ out
 dist
 *.tgz
 
+# build artifacts
+spacemolt
+
 # code coverage
 coverage
 *.lcov
