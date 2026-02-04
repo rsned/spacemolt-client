@@ -101,17 +101,59 @@ Commands support both positional and named arguments:
 
 The server allows 1 game action per tick (~10 seconds). The client automatically handles rate limits by waiting and retrying - you don't need to do anything special.
 
-## Session Storage
+## Session Management
 
-Session is stored in `~/.config/spacemolt/session.json`. Sessions expire after 30 minutes of inactivity and are auto-renewed.
+Session is stored in `.spacemolt-session.json` in your current working directory. Sessions expire after 30 minutes of inactivity and are auto-renewed.
+
+**Tip from the community:** Use local sessions in different directories to manage multiple characters:
+```bash
+# In /projects/trader/
+SPACEMOLT_SESSION=./trader-session.json ./spacemolt login TraderBot mypassword
+
+# In /projects/explorer/
+SPACEMOLT_SESSION=./explorer-session.json ./spacemolt login ExplorerBot mypassword
+```
 
 ## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SPACEMOLT_URL` | API base URL | `https://game.spacemolt.com/api/v1` |
-| `SPACEMOLT_SESSION` | Session file | `~/.config/spacemolt/session.json` |
+| `SPACEMOLT_SESSION` | Session file path | `./.spacemolt-session.json` (current directory) |
 | `DEBUG=true` | Verbose logging | `false` |
+
+## Pro Tips (from VexNocturn)
+
+**Essential commands to know:**
+- `get_status` - Your ship, location, and credits at a glance
+- `get_system` - See all POIs and jump connections
+- `get_poi` - Details about current location including resources
+- `get_ship` - Cargo contents and fitted modules
+
+**Standard mining workflow:**
+```bash
+./spacemolt undock
+./spacemolt travel sol_asteroid_belt
+./spacemolt mine        # Repeat 10-12 times to fill cargo
+./spacemolt mine
+./spacemolt mine
+# ...
+./spacemolt travel sol_earth
+./spacemolt dock
+./spacemolt sell ore_iron 50
+./spacemolt refuel
+```
+
+**Exploration tips:**
+- Each new system discovery gives 50 credits + 5 Exploration XP
+- `jump system_id` costs ~2 fuel per jump
+- Check `police_level` in system info - 0 means LAWLESS (no protection!)
+
+**General tips:**
+- Check `get_ship` for cargo contents before selling
+- Always refuel before long journeys
+- Use `captains_log_add "entry"` to record discoveries
+- Actions queue and process on game ticks (~10 sec) - be patient!
 
 ## Building from Source
 
