@@ -33,7 +33,7 @@ cd client && bun install
 
 ```bash
 # Register a new account - SAVE YOUR PASSWORD!
-bun run src/client.ts register <username> solarian
+bun run src/client.ts register <username> outerrim
 ```
 
 You will receive a random password. **Save this password** - there is no recovery system.

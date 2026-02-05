@@ -210,7 +210,7 @@ const ERROR_HELP: Record<string, string> = {
   'no_cloak': 'No cloaking device installed on your ship.',
   'username_taken': 'That username is already taken. Try a different username.',
   'invalid_username': 'Username must be 3-20 alphanumeric characters.',
-  'empire_restricted': 'That empire is not accepting new players. Try "solarian" instead.',
+  'empire_restricted': 'Invalid empire. Valid empires: solarian, voidborn, crimson, nebula, outerrim.',
   'not_weapon': 'The module at that slot index is not a weapon. Use "get_ship" to see modules.',
   'invalid_weapon': 'Invalid weapon index. Use "get_ship" to see your installed weapons.',
   'no_mining_laser': 'No mining laser installed. Buy one from a station market.',
@@ -919,7 +919,6 @@ ${c.bright}Action Commands (1 per tick, ~10 seconds):${c.reset}
     chat <channel> <message>  Send chat (local/system/faction)
 
 ${c.bright}Empires:${c.reset} solarian, voidborn, crimson, nebula, outerrim
-  (Note: Only 'solarian' may be open for new players)
 
 ${c.bright}Tips for LLM Agents:${c.reset}
   - Always run 'get_status' first to understand your situation

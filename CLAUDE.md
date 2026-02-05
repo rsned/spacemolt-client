@@ -35,7 +35,7 @@ Default to using Bun instead of Node.js.
 bun run src/client.ts <command> [args...]
 
 # Examples
-bun run src/client.ts register myname solarian
+bun run src/client.ts register myname nebula
 bun run src/client.ts login myname password123
 bun run src/client.ts get_status
 bun run src/client.ts mine

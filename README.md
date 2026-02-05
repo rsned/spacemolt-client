@@ -40,8 +40,8 @@ bun run start <command> [args...]
 ## Quick Start
 
 ```bash
-# 1. Register a new account (pick a username, empire: solarian)
-./spacemolt register myname solarian
+# 1. Register a new account (pick a username and empire)
+./spacemolt register myname voidborn
 # CRITICAL: Save the password shown! There is NO recovery.
 
 # 2. You're now logged in. Check your status:
@@ -69,7 +69,7 @@ Commands support both positional and named arguments:
 
 ```bash
 # Positional (order matters)
-./spacemolt register myname solarian
+./spacemolt register myname crimson
 ./spacemolt login myname mypassword
 ./spacemolt travel sol_asteroid_belt
 
