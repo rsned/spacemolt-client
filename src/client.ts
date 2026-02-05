@@ -31,7 +31,9 @@ import * as os from 'os';
 
 const API_BASE = process.env.SPACEMOLT_URL || 'https://game.spacemolt.com/api/v1';
 const DEBUG = process.env.DEBUG === 'true';
-const VERSION = '0.6.5';
+const VERSION = '0.6.6';
+const GITHUB_REPO = 'SpaceMolt/client';
+const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // ANSI colors
 const c = {
@@ -216,6 +218,107 @@ const ERROR_HELP: Record<string, string> = {
   'no_mining_laser': 'No mining laser installed. Buy one from a station market.',
   'not_asteroid': 'You can only mine at asteroid belts. Travel to one first.',
 };
+
+// =============================================================================
+// Version Update Check
+// =============================================================================
+
+interface UpdateCheckCache {
+  checked_at: string;
+  latest_version: string;
+}
+
+function getUpdateCachePath(): string {
+  return path.join(os.homedir(), '.config', 'spacemolt', 'update-check.json');
+}
+
+async function loadUpdateCache(): Promise<UpdateCheckCache | null> {
+  try {
+    const file = Bun.file(getUpdateCachePath());
+    if (await file.exists()) return await file.json();
+  } catch { /* no cache */ }
+  return null;
+}
+
+async function saveUpdateCache(cache: UpdateCheckCache): Promise<void> {
+  const cachePath = getUpdateCachePath();
+  const parentDir = path.dirname(cachePath);
+  if (!fs.existsSync(parentDir)) fs.mkdirSync(parentDir, { recursive: true });
+  await Bun.write(cachePath, JSON.stringify(cache, null, 2));
+}
+
+function compareVersions(current: string, latest: string): number {
+  const currentParts = current.replace(/^v/, '').split('.').map(Number);
+  const latestParts = latest.replace(/^v/, '').split('.').map(Number);
+
+  for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+    const curr = currentParts[i] || 0;
+    const lat = latestParts[i] || 0;
+    if (lat > curr) return 1;  // latest is newer
+    if (lat < curr) return -1; // current is newer
+  }
+  return 0; // equal
+}
+
+async function checkForUpdates(): Promise<void> {
+  // Skip update check if disabled via env var
+  if (process.env.SPACEMOLT_NO_UPDATE_CHECK === 'true') return;
+
+  try {
+    // Check cache to avoid spamming GitHub API
+    const cache = await loadUpdateCache();
+    if (cache) {
+      const lastCheck = new Date(cache.checked_at).getTime();
+      if (Date.now() - lastCheck < UPDATE_CHECK_INTERVAL_MS) {
+        // Use cached result
+        if (compareVersions(VERSION, cache.latest_version) > 0) {
+          printUpdateNotice(cache.latest_version);
+        }
+        return;
+      }
+    }
+
+    // Fetch latest release from GitHub
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
+      headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'SpaceMolt-Client' },
+      signal: AbortSignal.timeout(3000), // 3 second timeout
+    });
+
+    if (!response.ok) {
+      if (DEBUG) console.log(`${c.dim}[DEBUG] Update check failed: HTTP ${response.status}${c.reset}`);
+      return;
+    }
+
+    const release = await response.json() as { tag_name: string };
+    const latestVersion = release.tag_name.replace(/^v/, '');
+
+    // Save to cache
+    await saveUpdateCache({
+      checked_at: new Date().toISOString(),
+      latest_version: latestVersion,
+    });
+
+    // Check if update is available
+    if (compareVersions(VERSION, latestVersion) > 0) {
+      printUpdateNotice(latestVersion);
+    }
+  } catch (error) {
+    // Silently ignore update check failures - don't disrupt the user's workflow
+    if (DEBUG) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log(`${c.dim}[DEBUG] Update check failed: ${msg}${c.reset}`);
+    }
+  }
+}
+
+function printUpdateNotice(latestVersion: string): void {
+  console.log(`${c.yellow}╭─────────────────────────────────────────────────────────────╮${c.reset}`);
+  console.log(`${c.yellow}│${c.reset}  ${c.bright}Update available!${c.reset} ${c.dim}v${VERSION}${c.reset} → ${c.green}v${latestVersion}${c.reset}                        ${c.yellow}│${c.reset}`);
+  console.log(`${c.yellow}│${c.reset}  Run: ${c.cyan}curl -fsSL https://spacemolt.com/install.sh | bash${c.reset}  ${c.yellow}│${c.reset}`);
+  console.log(`${c.yellow}│${c.reset}  Or download from: ${c.cyan}https://github.com/${GITHUB_REPO}/releases${c.reset}   ${c.yellow}│${c.reset}`);
+  console.log(`${c.yellow}╰─────────────────────────────────────────────────────────────╯${c.reset}`);
+  console.log('');
+}
 
 // =============================================================================
 // Session Management
@@ -958,6 +1061,9 @@ function displayError(_command: string, error: { code: string; message: string; 
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+
+  // Check for updates in the background (non-blocking)
+  checkForUpdates();
 
   if (args.length === 0 || args[0] === '--help' || args[0] === '-h') {
     showHelp();

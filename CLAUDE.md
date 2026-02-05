@@ -28,6 +28,35 @@ Default to using Bun instead of Node.js.
 - Bun automatically loads .env, so don't use dotenv.
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
 
+## Versioning and Releases
+
+The client uses semantic versioning (semver) with GitHub releases.
+
+### Version Sources (keep in sync)
+1. `package.json` - `"version": "X.Y.Z"`
+2. `src/client.ts` - `const VERSION = 'X.Y.Z';`
+
+### Update Check Feature
+- Client checks GitHub API for latest release on startup
+- Notifies user if a newer version is available
+- Caches result in `~/.config/spacemolt/update-check.json` for 24 hours
+- Disable with `SPACEMOLT_NO_UPDATE_CHECK=true`
+- Non-blocking, 3 second timeout, fails silently
+
+### Releasing a New Version
+
+1. Update version in both `package.json` and `src/client.ts`
+2. Commit changes: `git add . && git commit -m "Release vX.Y.Z"`
+3. Tag the release: `git tag -a vX.Y.Z -m "Description"`
+4. Push: `git push && git push origin vX.Y.Z`
+5. GitHub Actions builds binaries for all platforms and creates a release
+
+### CI/CD
+
+GitHub Actions workflow (`.github/workflows/release.yml`) triggers on `v*` tags:
+- Builds binaries for Linux (x64/arm64), macOS (x64/arm64), Windows (x64)
+- Uploads all binaries to GitHub Release
+
 ## Usage
 
 ```bash
