@@ -892,7 +892,7 @@ ${c.bright}Information Commands (unlimited):${c.reset}
   get_nearby          Other players at your POI
   get_skills          Your skill levels and XP
   get_wrecks          Wrecks at POI (for looting)
-  get_map             Your discovered systems
+  get_map             Galaxy map (all systems)
   help                Full command list from server
   get_commands        Structured command list (for automation)
 
