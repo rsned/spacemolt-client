@@ -39,7 +39,7 @@ The client uses semantic versioning (semver) with GitHub releases.
 ### Update Check Feature
 - Client checks GitHub API for latest release on startup
 - Notifies user if a newer version is available
-- Caches result in `~/.config/spacemolt/update-check.json` for 24 hours
+- Caches result in `~/.config/spacemolt/update-check.json` for 5 minutes
 - Disable with `SPACEMOLT_NO_UPDATE_CHECK=true`
 - Non-blocking, 3 second timeout, fails silently
 
