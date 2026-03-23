@@ -29,6 +29,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .spacemolt-credentials.json
 .spacemolt-session.json
 
+# test results
+test-results/
+*.log
+
 # caches
 .eslintcache
 .cache
@@ -39,3 +43,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+UPDATE_TODO.md
+tools/FAILURES.md
+tools/SUMMARY.md
