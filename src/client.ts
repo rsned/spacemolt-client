@@ -52,6 +52,22 @@ const c = {
   cyan: '\x1b[36m',
 };
 
+/** Apply 24-bit ANSI foreground (primary) and background (secondary) from hex color strings. */
+function hexColor(text: string, fg?: string, bg?: string): string {
+  if (!fg && !bg) return text;
+  const hex = (h: string) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  let prefix = '';
+  if (fg) {
+    const [r, g, b] = hex(fg);
+    prefix += `\x1b[38;2;${r};${g};${b}m`;
+  }
+  if (bg) {
+    const [r, g, b] = hex(bg);
+    prefix += `\x1b[48;2;${r};${g};${b}m`;
+  }
+  return `${prefix}${text}${c.reset}`;
+}
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -1261,48 +1277,70 @@ const resultFormatters: ResultFormatter[] = [
     return true;
   },
 
-  // System info
+  // System info — response wraps data under r.system
   (r) => {
-    if (!r.id || !r.pois || !r.connections) return false;
-    console.log(`\n${c.bright}=== System: ${r.name} ===${c.reset}`);
-    console.log(`ID: ${r.id}`);
-    console.log(`Empire: ${r.empire || 'None'}`);
-    console.log(`Police Level: ${r.police_level} (${r.security_status || 'unknown security'})`);
-    if (r.description) console.log(`Description: ${r.description}`);
+    const sys = r.system as Record<string, unknown> | undefined;
+    if (!sys?.id || !sys.pois || !sys.connections) return false;
+    console.log(`\n${c.bright}=== System: ${sys.name} ===${c.reset}`);
+    console.log(`ID: ${sys.id}`);
+    console.log(`Empire: ${sys.empire || 'None'}`);
+    console.log(`Police Level: ${sys.police_level} (${r.security_status || sys.security_status || 'unknown security'})`);
+    if (sys.description) console.log(`Description: ${sys.description}`);
 
+    const pois = sys.pois as Array<Record<string, unknown>>;
     console.log(`\n${c.bright}Points of Interest:${c.reset}`);
-    for (const poiId of r.pois as string[]) console.log(`  - ${poiId}`);
-
-    console.log(`\n${c.bright}Connected Systems:${c.reset}`);
-    for (const connId of r.connections as string[]) console.log(`  - ${connId}`);
-    return true;
-  },
-
-  // POI info
-  (r) => {
-    if (!r.id || !r.type || !r.system_id) return false;
-    console.log(`\n${c.bright}=== POI: ${r.name} ===${c.reset}`);
-    console.log(`ID: ${r.id}`);
-    console.log(`Type: ${r.type}`);
-    console.log(`System: ${r.system_id}`);
-    if (r.description) console.log(`Description: ${r.description}`);
-
-    const resources = r.resources as Array<Record<string, unknown>> | undefined;
-    if (resources?.length) {
-      console.log(`\n${c.bright}Resources:${c.reset}`);
-      for (const res of resources)
-        console.log(`  - ${res.resource_id}: richness ${res.richness}, remaining ${res.remaining}`);
+    for (const poi of pois) {
+      const online = (poi.online as number) > 0 ? ` ${c.cyan}(${poi.online} online)${c.reset}` : '';
+      const base = poi.has_base ? ` ${c.green}[base]${c.reset}` : '';
+      console.log(`  - ${poi.name} (${poi.type})${base}${online}  ${c.dim}${poi.id}${c.reset}`);
     }
-    if (r.base_id) console.log(`\nBase: ${r.base_id} (use 'dock' to enter)`);
+
+    const connections = sys.connections as Array<Record<string, unknown>>;
+    console.log(`\n${c.bright}Connected Systems:${c.reset}`);
+    for (const conn of connections) {
+      console.log(`  - ${conn.name} ${c.dim}(${conn.distance} ly)${c.reset}  ${c.dim}${conn.system_id}${c.reset}`);
+    }
+
+    const currentPoi = r.poi as Record<string, unknown> | undefined;
+    if (currentPoi) {
+      console.log(`\n${c.bright}Current POI:${c.reset} ${currentPoi.name} (${currentPoi.type})  ${c.dim}${currentPoi.id}${c.reset}`);
+    }
     return true;
   },
 
-  // Cargo
+  // POI info — response wraps data under r.poi
   (r) => {
-    if (r.cargo === undefined || r.cargo_used === undefined) return false;
+    const poi = r.poi as Record<string, unknown> | undefined;
+    if (!poi?.id || !poi.type || !poi.system_id) return false;
+    console.log(`\n${c.bright}=== POI: ${poi.name} ===${c.reset}`);
+    console.log(`ID: ${poi.id}`);
+    console.log(`Type: ${poi.type}`);
+    console.log(`System: ${poi.system_id}`);
+    if (poi.description) console.log(`Description: ${poi.description}`);
+
+    if (poi.base_id) console.log(`\nBase: ${poi.base_id} (use 'dock' to enter)`);
+
+    const base = r.base as Record<string, unknown> | undefined;
+    if (base) {
+      console.log(`\n${c.bright}Base: ${base.name}${c.reset}`);
+      if (base.description) console.log(`  ${base.description}`);
+      console.log(`  Empire: ${base.empire || 'None'}`);
+      console.log(`  Defense: ${base.defense_level}`);
+    }
+
+    const services = r.services as string[] | undefined;
+    if (services?.length) {
+      console.log(`\n${c.bright}Services:${c.reset} ${services.join(', ')}`);
+    }
+    return true;
+  },
+
+  // Cargo — field renamed from cargo_used to used
+  (r) => {
+    if (r.cargo === undefined || r.used === undefined) return false;
     const cargo = (r.cargo as Array<Record<string, unknown>>) || [];
     console.log(`\n${c.bright}=== Cargo ===${c.reset}`);
-    console.log(`Used: ${r.cargo_used}/${r.cargo_capacity} (${r.cargo_available} available)`);
+    console.log(`Used: ${r.used}/${r.capacity} (${r.available} available)`);
     if (!cargo.length) {
       console.log(`\n(Empty)`);
     } else {
@@ -1315,23 +1353,51 @@ const resultFormatters: ResultFormatter[] = [
     return true;
   },
 
-  // Nearby players
+  // Nearby (players, pirates, empire NPCs)
   (r) => {
-    if (!Array.isArray(r.players)) return false;
-    const players = r.players as Array<Record<string, unknown>>;
-    console.log(`\n${c.bright}=== Nearby Players ===${c.reset}`);
+    if (!Array.isArray(r.nearby)) return false;
+    const players = r.nearby as Array<Record<string, unknown>>;
+    const pirates = (r.pirates as Array<Record<string, unknown>>) || [];
+    const npcs = (r.empire_npcs as Array<Record<string, unknown>>) || [];
+
+    console.log(`\n${c.bright}=== Nearby ===${c.reset}`);
+
+    // Players
+    console.log(`\n${c.bright}Players (${(r.count as number) || players.length}):${c.reset}`);
     if (!players.length) {
-      console.log(`(No other players at this location)`);
+      console.log(`  (No other players at this location)`);
     } else {
       for (const p of players) {
-        const name = p.anonymous ? '[Anonymous]' : p.username;
+        const rawName = p.anonymous ? '[Anonymous]' : (p.username as string);
+        const name = hexColor(rawName, p.primary_color as string, p.secondary_color as string);
         const faction = p.faction_tag ? ` [${p.faction_tag}]` : '';
         const status = p.status_message ? ` - "${p.status_message}"` : '';
         const combat = p.in_combat ? ` ${c.red}[IN COMBAT]${c.reset}` : '';
         console.log(`  ${name}${faction} (${p.ship_class})${status}${combat}`);
-        console.log(`    ID: ${p.player_id}`);
       }
     }
+
+    // Pirates
+    if ((r.pirate_count as number) > 0) {
+      console.log(`\n${c.red}Pirates (${r.pirate_count}):${c.reset}`);
+      for (const p of pirates) {
+        const name = p.name || p.pirate_id || 'Unknown';
+        const ship = p.ship_class ? ` (${p.ship_class})` : '';
+        const combat = p.in_combat ? ` ${c.red}[IN COMBAT]${c.reset}` : '';
+        console.log(`  ${name}${ship}${combat}`);
+      }
+    }
+
+    // Empire NPCs
+    if ((r.empire_npc_count as number) > 0) {
+      console.log(`\n${c.dim}Empire NPCs (${r.empire_npc_count}):${c.reset}`);
+      for (const n of npcs) {
+        const name = n.name || n.npc_id || 'Unknown';
+        const ship = n.ship_class ? ` (${n.ship_class})` : '';
+        console.log(`  ${name}${ship}`);
+      }
+    }
+
     return true;
   },
 
