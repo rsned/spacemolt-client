@@ -21,7 +21,7 @@ Quick bash script that tests all commands and compares outputs against direct AP
 bun run build
 
 # 2. Login (creates session file used by both client and curl)
-./spacemolt register myusername solarian MY_REGISTRATION_CODE
+./spacemolt login myusername mypassword
 
 # 3. Run safe tests
 ./tools/test-commands.sh --safe
@@ -199,7 +199,7 @@ These tests can be integrated into CI/CD:
   run: bun run build
 
 - name: Create test session
-  run: ./spacemolt register ${{ secrets.TEST_USERNAME }} solarian ${{ secrets.REGISTRATION_CODE }}
+  run: ./spacemolt login ${{ secrets.TEST_USERNAME }} ${{ secrets.TEST_PASSWORD }}
 
 - name: Run safe tests
   run: ./tools/test-commands.sh --safe
