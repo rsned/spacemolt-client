@@ -68,6 +68,16 @@ function hexColor(text: string, fg?: string, bg?: string): string {
   return `${prefix}${text}${c.reset}`;
 }
 
+/** Format a player entry for display (used by get_nearby and get_location). */
+function formatPlayer(p: Record<string, unknown>): string {
+  const rawName = p.anonymous ? '[Anonymous]' : (p.username as string);
+  const name = hexColor(rawName, p.primary_color as string, p.secondary_color as string);
+  const faction = p.faction_tag ? ` [${p.faction_tag}]` : '';
+  const status = p.status_message ? ` - "${p.status_message}"` : '';
+  const combat = p.in_combat ? ` ${c.red}[IN COMBAT]${c.reset}` : '';
+  return `${name}${faction} (${p.ship_class})${status}${combat}`;
+}
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -1202,10 +1212,16 @@ function displayNotifications(notifications?: APIResponse['notifications']): voi
 // Result Display
 // =============================================================================
 
-type ResultFormatter = (result: Record<string, unknown>) => boolean;
+interface NamedFormatter {
+  name: string;
+  /** Keys that hint this formatter *should* match — used for drift detection */
+  hintKeys: string[];
+  format: (result: Record<string, unknown>) => boolean;
+}
 
-const resultFormatters: ResultFormatter[] = [
+const resultFormatters: NamedFormatter[] = [
   // Player status
+  { name: 'player_status', hintKeys: ['player', 'ship'], format:
   (r) => {
     if (!r.player || !r.ship) return false;
     const p = r.player as Record<string, unknown>;
@@ -1259,10 +1275,10 @@ const resultFormatters: ResultFormatter[] = [
       if (nearby.length > 5) console.log(`  ... and ${nearby.length - 5} more`);
     }
     return true;
-  },
+  } },
 
   // Registration
-  (r) => {
+  { name: 'registration', hintKeys: ['password', 'player_id'], format: (r) => {
     if (!r.password || !r.player_id) return false;
     console.log(`\n${c.green}${c.bright}=== Registration Successful ===${c.reset}`);
     console.log(`Player ID: ${r.player_id}`);
@@ -1275,10 +1291,10 @@ const resultFormatters: ResultFormatter[] = [
     console.log(`  mine          - Mine resources (at asteroid belts)`);
     console.log(`  help          - Get full command list from server`);
     return true;
-  },
+  } },
 
   // System info — response wraps data under r.system
-  (r) => {
+  { name: 'system_info', hintKeys: ['system', 'poi', 'security_status'], format: (r) => {
     const sys = r.system as Record<string, unknown> | undefined;
     if (!sys?.id || !sys.pois || !sys.connections) return false;
     console.log(`\n${c.bright}=== System: ${sys.name} ===${c.reset}`);
@@ -1306,10 +1322,10 @@ const resultFormatters: ResultFormatter[] = [
       console.log(`\n${c.bright}Current POI:${c.reset} ${currentPoi.name} (${currentPoi.type})  ${c.dim}${currentPoi.id}${c.reset}`);
     }
     return true;
-  },
+  } },
 
   // POI info — response wraps data under r.poi
-  (r) => {
+  { name: 'poi_info', hintKeys: ['poi', 'base', 'services'], format: (r) => {
     const poi = r.poi as Record<string, unknown> | undefined;
     if (!poi?.id || !poi.type || !poi.system_id) return false;
     console.log(`\n${c.bright}=== POI: ${poi.name} ===${c.reset}`);
@@ -1317,6 +1333,28 @@ const resultFormatters: ResultFormatter[] = [
     console.log(`Type: ${poi.type}`);
     console.log(`System: ${poi.system_id}`);
     if (poi.description) console.log(`Description: ${poi.description}`);
+    if (poi.class) console.log(`Class: ${poi.class}`);
+
+    const resources = r.resources as Array<Record<string, unknown>> | undefined;
+    if (resources?.length) {
+      console.log(`\n${c.bright}Resources:${c.reset}`);
+      for (const res of resources) {
+        const display = res.remaining_display || `${res.remaining} remaining`;
+        if (display === 'depleted' || res.remaining === 0) {
+          // \x1b[9m = strikethrough
+          console.log(`  - \x1b[9m${c.dim}${res.name || res.resource_id}: richness ${res.richness}, depleted${c.reset}\x1b[29m`);
+        } else {
+          let depletion = '';
+          if (res.depletion_percent !== undefined) {
+            const pct = Number(res.depletion_percent);
+            const color = pct > 25 ? c.green : pct >= 5 ? c.yellow : c.red;
+            depletion = ` (${color}${pct.toFixed(2)}% remaining${c.reset})`;
+          }
+          const remaining = res.max_remaining ? `${res.remaining}/${res.max_remaining}` : display;
+          console.log(`  - ${res.name || res.resource_id}: richness ${res.richness}, ${remaining}${depletion}`);
+        }
+      }
+    }
 
     if (poi.base_id) console.log(`\nBase: ${poi.base_id} (use 'dock' to enter)`);
 
@@ -1333,10 +1371,10 @@ const resultFormatters: ResultFormatter[] = [
       console.log(`\n${c.bright}Services:${c.reset} ${services.join(', ')}`);
     }
     return true;
-  },
+  } },
 
   // Cargo — field renamed from cargo_used to used
-  (r) => {
+  { name: 'cargo', hintKeys: ['cargo', 'used', 'capacity'], format: (r) => {
     if (r.cargo === undefined || r.used === undefined) return false;
     const cargo = (r.cargo as Array<Record<string, unknown>>) || [];
     console.log(`\n${c.bright}=== Cargo ===${c.reset}`);
@@ -1351,10 +1389,10 @@ const resultFormatters: ResultFormatter[] = [
       }
     }
     return true;
-  },
+  } },
 
   // Nearby (players, pirates, empire NPCs)
-  (r) => {
+  { name: 'nearby', hintKeys: ['nearby', 'count', 'pirate_count'], format: (r) => {
     if (!Array.isArray(r.nearby)) return false;
     const players = r.nearby as Array<Record<string, unknown>>;
     const pirates = (r.pirates as Array<Record<string, unknown>>) || [];
@@ -1367,14 +1405,7 @@ const resultFormatters: ResultFormatter[] = [
     if (!players.length) {
       console.log(`  (No other players at this location)`);
     } else {
-      for (const p of players) {
-        const rawName = p.anonymous ? '[Anonymous]' : (p.username as string);
-        const name = hexColor(rawName, p.primary_color as string, p.secondary_color as string);
-        const faction = p.faction_tag ? ` [${p.faction_tag}]` : '';
-        const status = p.status_message ? ` - "${p.status_message}"` : '';
-        const combat = p.in_combat ? ` ${c.red}[IN COMBAT]${c.reset}` : '';
-        console.log(`  ${name}${faction} (${p.ship_class})${status}${combat}`);
-      }
+      for (const p of players) console.log(`  ${formatPlayer(p)}`);
     }
 
     // Pirates
@@ -1399,10 +1430,10 @@ const resultFormatters: ResultFormatter[] = [
     }
 
     return true;
-  },
+  } },
 
   // Wrecks
-  (r) => {
+  { name: 'wrecks', hintKeys: ['wrecks'], format: (r) => {
     if (!Array.isArray(r.wrecks)) return false;
     const wrecks = r.wrecks as Array<Record<string, unknown>>;
     console.log(`\n${c.bright}=== Wrecks at POI ===${c.reset}`);
@@ -1421,10 +1452,10 @@ const resultFormatters: ResultFormatter[] = [
       }
     }
     return true;
-  },
+  } },
 
   // Skills (v2 format: player_skills array + skills metadata)
-  (r) => {
+  { name: 'skills_v2', hintKeys: ['skills', 'player_skills'], format: (r) => {
     if (r.skills === undefined || r.player_skills === undefined) return false;
     const playerSkills = (r.player_skills as Array<Record<string, unknown>>) || [];
     console.log(`\n${c.bright}=== Your Skills ===${c.reset}`);
@@ -1447,10 +1478,10 @@ const resultFormatters: ResultFormatter[] = [
       }
     }
     return true;
-  },
+  } },
 
   // Skills (v1 format: skills as object map of skill_id -> skill data)
-  (r) => {
+  { name: 'skills_v1', hintKeys: ['skills'], format: (r) => {
     if (!r.skills || typeof r.skills !== 'object' || Array.isArray(r.skills)) return false;
     const skills = r.skills as Record<
       string,
@@ -1486,10 +1517,10 @@ const resultFormatters: ResultFormatter[] = [
       }
     }
     return true;
-  },
+  } },
 
   // Ship listings (browse_ships) — must come before market listings since both use r.listings
-  (r) => {
+  { name: 'ship_listings', hintKeys: ['listings'], format: (r) => {
     if (!Array.isArray(r.listings)) return false;
     const listings = r.listings as Array<Record<string, unknown>>;
     if (listings.length === 0 || !listings[0].ship_id) return false;
@@ -1515,10 +1546,10 @@ const resultFormatters: ResultFormatter[] = [
       console.log(`  Listing ID: ${listing.listing_id}`);
     }
     return true;
-  },
+  } },
 
   // Market listings
-  (r) => {
+  { name: 'market_listings', hintKeys: ['listings'], format: (r) => {
     if (!Array.isArray(r.listings)) return false;
     const listings = r.listings as Array<Record<string, unknown>>;
     console.log(`\n${c.bright}=== Market Listings ===${c.reset}`);
@@ -1537,11 +1568,11 @@ const resultFormatters: ResultFormatter[] = [
       }
     }
     return true;
-  },
+  } },
 
   // Location info (get_location) — must come before simple message formatter since
   // the response has both r.location and r.message, which the simple formatter swallows
-  (r) => {
+  { name: 'location_info', hintKeys: ['location'], format: (r) => {
     if (!r.location || typeof r.location !== 'object') return false;
     const loc = r.location as {
       system_id: string;
@@ -1574,9 +1605,7 @@ const resultFormatters: ResultFormatter[] = [
     if (loc.nearby_player_count > 0) {
       console.log(`\n${c.bright}Nearby Players (${loc.nearby_player_count}):${c.reset}`);
       for (const player of loc.nearby_players.slice(0, 10)) {
-        const inCombat = player.in_combat ? ` ${c.red}[IN COMBAT]${c.reset}` : '';
-        const tag = player.faction_tag ? ` (${player.faction_tag})` : '';
-        console.log(`  ${player.username} — ${player.ship_class}${tag}${inCombat}`);
+        console.log(`  ${formatPlayer(player)}`);
       }
       if (loc.nearby_player_count > 10) {
         console.log(`  ... and ${loc.nearby_player_count - 10} more`);
@@ -1589,17 +1618,17 @@ const resultFormatters: ResultFormatter[] = [
       console.log(`\n${c.dim}Nearby NPCs: ${loc.nearby_empire_npc_count}${c.reset}`);
     }
     return true;
-  },
+  } },
 
   // Simple message
-  (r) => {
+  { name: 'simple_message', hintKeys: ['message'], format: (r) => {
     if (!r.message || Object.keys(r).length > 2) return false;
     console.log(`${c.green}OK:${c.reset} ${r.message}`);
     return true;
-  },
+  } },
 ];
 
-function displayResult(_command: string, result?: Record<string, unknown>): void {
+function displayResult(command: string, result?: Record<string, unknown>): void {
   if (!result) return;
 
   // Show auto-dock/undock flags before the result
@@ -1609,7 +1638,20 @@ function displayResult(_command: string, result?: Record<string, unknown>): void
     console.log(`${c.cyan}[AUTO-UNDOCKED]${c.reset} Automatically undocked from station (cost 1 extra tick)`);
 
   for (const formatter of resultFormatters) {
-    if (formatter(result)) return;
+    if (formatter.format(result)) return;
+  }
+
+  // No formatter matched — check for possible drift (hint keys present but format failed)
+  const resultKeys = Object.keys(result);
+  const nearMisses = resultFormatters.filter(
+    (f) => f.hintKeys.length > 0 && f.hintKeys.some((k) => resultKeys.includes(k)),
+  );
+  if (nearMisses.length > 0) {
+    const names = nearMisses.map((f) => f.name).join(', ');
+    console.error(
+      `${c.yellow}[DRIFT WARNING]${c.reset} '${command}' response has keys matching formatter(s) [${names}] but none matched.` +
+        ` Response keys: [${resultKeys.join(', ')}]`,
+    );
   }
 
   // Default: print JSON
