@@ -1385,8 +1385,10 @@ const resultFormatters: NamedFormatter[] = [
     } else {
       console.log('');
       for (const item of cargo) {
-        const size = item.size ? ` (${item.size} each)` : '';
-        console.log(`  ${item.quantity}x ${item.name || item.item_id}${size}`);
+        const name = item.name || item.item_id;
+        const id = item.item_id && item.name ? ` ${c.dim}(${item.item_id})${c.reset}` : '';
+        const size = item.size ? `  Size: ${item.size}` : '';
+        console.log(`  ${item.quantity}x ${name}${id}${size}`);
       }
     }
     return true;
@@ -1634,6 +1636,14 @@ const resultFormatters: NamedFormatter[] = [
     } else {
       console.log(`\n(No other players here)`);
     }
+    return true;
+  } },
+
+  // Chat confirmation
+  { name: 'chat_sent', hintKeys: ['channel', 'message', 'sent_at'], format: (r) => {
+    if (!r.channel || !r.message || !r.sent_at) return false;
+    const time = new Date(r.sent_at as string).toLocaleTimeString();
+    console.log(`${c.green}[${r.channel}]${c.reset} ${c.dim}${time}${c.reset} ${r.message}`);
     return true;
   } },
 
