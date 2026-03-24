@@ -75,7 +75,8 @@ function formatPlayer(p: Record<string, unknown>): string {
   const faction = p.faction_tag ? ` [${p.faction_tag}]` : '';
   const status = p.status_message ? ` - "${p.status_message}"` : '';
   const combat = p.in_combat ? ` ${c.red}[IN COMBAT]${c.reset}` : '';
-  return `${name}${faction} (${p.ship_class})${status}${combat}`;
+  const ship = p.ship_class ? ` (${p.ship_class})` : '';
+  return `${name}${faction}${ship}${status}${combat}`;
 }
 
 // =============================================================================
@@ -1620,6 +1621,22 @@ const resultFormatters: NamedFormatter[] = [
     return true;
   } },
 
+  // Arrival (travel/jump) — shows destination and online players
+  { name: 'arrival', hintKeys: ['poi_id', 'online_players'], format: (r) => {
+    if (!r.poi_id || !Array.isArray(r.online_players)) return false;
+    console.log(`\n${c.green}Arrived at ${c.bright}${r.poi || r.poi_id}${c.reset}`);
+    const players = r.online_players as Array<Record<string, unknown>>;
+    const count = (r.online_players_count as number) || players.length;
+    if (count > 0) {
+      console.log(`\n${c.bright}Players here (${count}):${c.reset}`);
+      for (const p of players) console.log(`  ${formatPlayer(p)}`);
+      if (r.online_players_truncated) console.log(`  ... and more`);
+    } else {
+      console.log(`\n(No other players here)`);
+    }
+    return true;
+  } },
+
   // Simple message
   { name: 'simple_message', hintKeys: ['message'], format: (r) => {
     if (!r.message || Object.keys(r).length > 2) return false;
@@ -1644,7 +1661,7 @@ function displayResult(command: string, result?: Record<string, unknown>): void 
   // No formatter matched — check for possible drift (hint keys present but format failed)
   const resultKeys = Object.keys(result);
   const nearMisses = resultFormatters.filter(
-    (f) => f.hintKeys.length > 0 && f.hintKeys.some((k) => resultKeys.includes(k)),
+    (f) => f.hintKeys.length > 0 && f.hintKeys.every((k) => resultKeys.includes(k)),
   );
   if (nearMisses.length > 0) {
     const names = nearMisses.map((f) => f.name).join(', ');
