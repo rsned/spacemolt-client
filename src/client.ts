@@ -79,6 +79,33 @@ function formatPlayer(p: Record<string, unknown>): string {
   return `${name}${faction}${ship}${status}${combat}`;
 }
 
+/** Print an item list as an aligned table with ID, Name, Qty, and Unit Size columns. */
+function printItemTable(items: Array<Record<string, unknown>>, indent = '  '): void {
+  console.log(`${c.bright}Items (${items.length}):${c.reset}`);
+  if (!items.length) {
+    console.log(`${indent}(Empty)`);
+    return;
+  }
+  console.log('');
+  // Compute column widths
+  const idW = Math.max(2, ...items.map((i) => String(i.item_id || '').length));
+  const nameW = Math.max(4, ...items.map((i) => String(i.name || i.item_id || '').length));
+  const qtyW = Math.max(3, ...items.map((i) => String(i.quantity ?? '').length));
+  const sizeW = Math.max(9, ...items.map((i) => String(i.size ?? '').length));
+
+  const hdr = `${indent}${'Name'.padEnd(nameW)} | ${'ID'.padEnd(idW)} | ${'Qty'.padStart(qtyW)} | ${'Unit Size'.padStart(sizeW)}`;
+  const sep = `${indent}${'-'.repeat(nameW)}-+-${'-'.repeat(idW)}-+-${'-'.repeat(qtyW)}-+-${'-'.repeat(sizeW)}`;
+  console.log(hdr);
+  console.log(sep);
+  for (const item of items) {
+    const name = String(item.name || item.item_id || '').padEnd(nameW);
+    const id = String(item.item_id || '').padEnd(idW);
+    const qty = String(item.quantity ?? '').padStart(qtyW);
+    const size = String(item.size ?? '').padStart(sizeW);
+    console.log(`${indent}${name} | ${id} | ${qty} | ${size}`);
+  }
+}
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -1379,18 +1406,8 @@ const resultFormatters: NamedFormatter[] = [
     if (r.cargo === undefined || r.used === undefined) return false;
     const cargo = (r.cargo as Array<Record<string, unknown>>) || [];
     console.log(`\n${c.bright}=== Cargo ===${c.reset}`);
-    console.log(`Used: ${r.used}/${r.capacity} (${r.available} available)`);
-    if (!cargo.length) {
-      console.log(`\n(Empty)`);
-    } else {
-      console.log('');
-      for (const item of cargo) {
-        const name = item.name || item.item_id;
-        const id = item.item_id && item.name ? ` ${c.dim}(${item.item_id})${c.reset}` : '';
-        const size = item.size ? `  Size: ${item.size}` : '';
-        console.log(`  ${item.quantity}x ${name}${id}${size}`);
-      }
-    }
+    console.log(`Used: ${r.used}/${r.capacity} (${r.available} available)\n`);
+    printItemTable(cargo);
     return true;
   } },
 
@@ -1635,6 +1652,34 @@ const resultFormatters: NamedFormatter[] = [
       if (r.online_players_truncated) console.log(`  ... and more`);
     } else {
       console.log(`\n(No other players here)`);
+    }
+    return true;
+  } },
+
+  // Station storage
+  { name: 'storage', hintKeys: ['base_id', 'items'], format: (r) => {
+    if (!r.base_id || !Array.isArray(r.items)) return false;
+    const items = r.items as Array<Record<string, unknown>>;
+    const ships = (r.ships as Array<Record<string, unknown>>) || [];
+    console.log(`\n${c.bright}=== Storage at ${r.base_id} ===${c.reset}\n`);
+    printItemTable(items);
+    if (ships.length) {
+      const nameW = Math.max(9, ...ships.map((s) => String(s.class_name || s.class_id || '').length));
+      const classW = Math.max(5, ...ships.map((s) => String(s.class_id || '').length));
+      const idW = Math.max(2, ...ships.map((s) => String(s.ship_id || '').length));
+      const modsW = Math.max(4, ...ships.map((s) => String(s.modules ?? '').length));
+      const cargoW = Math.max(5, ...ships.map((s) => String(s.cargo_used ?? '').length));
+      console.log(`\n${c.bright}Ships (${ships.length}):${c.reset}\n`);
+      console.log(`  ${'Ship Name'.padEnd(nameW)} | ${'Class'.padEnd(classW)} | ${'Mods'.padStart(modsW)} | ${'Cargo'.padStart(cargoW)} | ${'ID'.padEnd(idW)}`);
+      console.log(`  ${'-'.repeat(nameW)}-+-${'-'.repeat(classW)}-+-${'-'.repeat(modsW)}-+-${'-'.repeat(cargoW)}-+-${'-'.repeat(idW)}`);
+      for (const s of ships) {
+        const name = String(s.class_name || s.class_id || '').padEnd(nameW);
+        const cls = String(s.class_id || '').padEnd(classW);
+        const mods = String(s.modules ?? '').padStart(modsW);
+        const cargo = String(s.cargo_used ?? '').padStart(cargoW);
+        const id = String(s.ship_id || '').padEnd(idW);
+        console.log(`  ${name} | ${cls} | ${mods} | ${cargo} | ${id}`);
+      }
     }
     return true;
   } },
